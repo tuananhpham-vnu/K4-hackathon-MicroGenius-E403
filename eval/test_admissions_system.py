@@ -6,7 +6,6 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from admissions_system import XmlPrompt, create_workflow
 from mas.prompt_templates import prompt_messages
-from mas.prompt_templates import prompt_messages
 
 
 class TraceabilityTests(unittest.TestCase):
@@ -23,7 +22,7 @@ class TraceabilityTests(unittest.TestCase):
         self.assertEqual(parsed["candidate_profile"]["major"], "AI")
 
     def test_query_keeps_source_and_scores(self):
-        result = self.workflow.answer("AI chatbot support xác định bài toán cho ai?")
+        result = self.workflow.answer("Chương trình học kéo dài bao lâu?")
         self.assertIn("request_id", result)
         self.assertTrue(result["prompt_xml"].startswith("<request>"))
         self.assertEqual(len(result["evidence"]), len(result["sources"]))
@@ -31,6 +30,11 @@ class TraceabilityTests(unittest.TestCase):
             self.assertTrue(evidence["source_id"])
             self.assertGreaterEqual(evidence["relevance_score"], 0.35)
             self.assertIn(evidence["source_id"], {source["source_id"] for source in result["sources"]})
+
+    def test_current_repository_corpus_is_loaded(self):
+        self.assertGreaterEqual(len(self.workflow.kb.sources), 6)
+        self.assertGreater(len(self.workflow.kb.documents), 20)
+        self.assertTrue(any(source.source_type == "official_admissions_document" for source in self.workflow.kb.sources.values()))
 
     def test_high_risk_routes_to_human(self):
         result = self.workflow.answer("Tôi muốn khiếu nại và xin ngoại lệ tuyển sinh")

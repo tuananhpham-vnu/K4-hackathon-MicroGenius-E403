@@ -1,5 +1,6 @@
 import csv
 import hashlib
+import json
 import re
 from pathlib import Path
 
@@ -10,8 +11,8 @@ from .utils import stable_id, tokens
 class KnowledgeBase:
     """Indexes local documents while preserving source metadata per chunk."""
 
-    def __init__(self, data_root: Path):
-        self.data_root = data_root
+    def __init__(self, repo_root: Path):
+        self.repo_root = repo_root
         self.sources: dict[str, Source] = {}
         self.documents: list[dict[str, str]] = []
         self._load()
@@ -22,16 +23,12 @@ class KnowledgeBase:
         return source
 
     def _load(self) -> None:
-        for path in sorted((self.data_root / "transcript").glob("*.md")):
+        legacy_root = self.repo_root / "data" / "vlearn-pack"
+        for path in sorted((legacy_root / "transcript").glob("*.md")):
             source = self._register(path.stem, path, "official_training_transcript", 0.86)
-            chunks = re.split(r"\n\s*\n", path.read_text(encoding="utf-8"))
-            for index, chunk in enumerate(chunks, 1):
-                clean = re.sub(r"\s+", " ", chunk).strip()
-                if len(clean) > 40:
-                    marker = re.search(r"\[(T\d+-\d+)\]", chunk)
-                    self.documents.append({"source_id": source.source_id, "locator": marker.group(1) if marker else f"paragraph-{index}", "text": clean[:2500]})
+            self._index_markdown(path, source)
 
-        csv_path = self.data_root / "chatlog" / "chat_history_anonymized_for_hackathon.csv"
+        csv_path = legacy_root / "chatlog" / "chat_history_anonymized_for_hackathon.csv"
         if csv_path.exists():
             source = self._register(csv_path.stem, csv_path, "anonymized_chatlog", 0.72)
             with csv_path.open(encoding="utf-8", newline="") as handle:
@@ -39,6 +36,47 @@ class KnowledgeBase:
                     content = (row.get("content") or "").strip()
                     if len(content) > 25:
                         self.documents.append({"source_id": source.source_id, "locator": f"{row.get('conversation_id', 'conversation')}/{row.get('message_id', 'message')}", "text": re.sub(r"\s+", " ", content)[:2500]})
+
+        # The current repository stores the approved admissions corpus here.
+        # Keeping this discovery explicit prevents a silently empty knowledge base.
+        for path in sorted((self.repo_root / "Tailieutubtc").glob("*.md")):
+            source = self._register(path.stem, path, "official_admissions_document", 0.92)
+            self._index_markdown(path, source)
+
+        for path in sorted((self.repo_root / "data").glob("*.json")):
+            self._index_community_json(path)
+
+    def _index_markdown(self, path: Path, source: Source) -> None:
+        chunks = re.split(r"\n\s*\n", path.read_text(encoding="utf-8"))
+        for index, chunk in enumerate(chunks, 1):
+            clean = re.sub(r"\s+", " ", chunk).strip()
+            if len(clean) <= 40:
+                continue
+            marker = re.search(r"\[(T\d+-\d+)\]", chunk)
+            self.documents.append({
+                "source_id": source.source_id,
+                "locator": marker.group(1) if marker else f"paragraph-{index}",
+                "text": clean[:2500],
+            })
+
+    def _index_community_json(self, path: Path) -> None:
+        try:
+            records = json.loads(path.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError):
+            return
+        if not isinstance(records, list):
+            return
+        source = self._register(path.stem, path, "community_observation", 0.62)
+        for index, record in enumerate(records, 1):
+            if not isinstance(record, dict):
+                continue
+            text = str(record.get("text") or "").strip()
+            if len(text) > 25:
+                self.documents.append({
+                    "source_id": source.source_id,
+                    "locator": f"post-{index}",
+                    "text": re.sub(r"\s+", " ", text)[:2500],
+                })
 
     def search(self, query: str, limit: int = 8) -> list[Evidence]:
         query_tokens = tokens(query)
@@ -52,13 +90,20 @@ class KnowledgeBase:
             ranked.append((score, document))
         ranked.sort(key=lambda item: item[0], reverse=True)
         results = []
-        for index, (score, document) in enumerate(ranked[:limit], 1):
+        seen_text: set[str] = set()
+        for score, document in ranked:
+            fingerprint = hashlib.sha1(document["text"].casefold().encode()).hexdigest()
+            if fingerprint in seen_text:
+                continue
+            seen_text.add(fingerprint)
             source = self.sources[document["source_id"]]
             key = f"{source.source_id}:{document['locator']}:{query}"
             results.append(Evidence(
-                evidence_id=f"ev_{index:03d}_{hashlib.sha1(key.encode()).hexdigest()[:8]}",
+                evidence_id=f"ev_{len(results) + 1:03d}_{hashlib.sha1(key.encode()).hexdigest()[:8]}",
                 source_id=source.source_id, quote=document["text"], locator=document["locator"],
                 relevance_score=round(score, 3), source_trust_score=source.trust_score,
                 query=query, source_check_passed=source.authority == "approved_local" and source.trust_score >= 0.7,
             ))
+            if len(results) >= limit:
+                break
         return results

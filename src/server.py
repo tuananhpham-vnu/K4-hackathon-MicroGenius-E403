@@ -1,16 +1,22 @@
 """Minimal HTTP API for the traceable admissions workflow."""
 
 import json
+import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import urlparse
 
-from langgraph_mas import LangGraphAdmissionsMAS
-from mas.ui import html_page
 from mas.workflow import create_workflow
+
+try:
+    from langgraph_mas import LangGraphAdmissionsMAS
+except ModuleNotFoundError:
+    LangGraphAdmissionsMAS = None
 
 
 WORKFLOW = create_workflow(Path(__file__).resolve().parents[1])
-MAS = LangGraphAdmissionsMAS(WORKFLOW)
+MAS = LangGraphAdmissionsMAS(WORKFLOW) if LangGraphAdmissionsMAS else None
+WEB_ROOT = Path(__file__).resolve().parents[1] / "codebase"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -23,16 +29,31 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:
-        if self.path == "/" or self.path.startswith("/?"):
-            self._send(html_page())
-        elif self.path == "/api/health":
+        request_path = urlparse(self.path).path
+        if request_path == "/api/health":
             self._send(json.dumps({"status": "ok", "sources": len(WORKFLOW.kb.sources), "documents": len(WORKFLOW.kb.documents)}), content_type="application/json")
-        elif self.path == "/api/audit":
+        elif request_path == "/api/audit":
             self._send(json.dumps(WORKFLOW.audit_log, ensure_ascii=False), content_type="application/json")
-        elif self.path == "/api/logs":
+        elif request_path == "/api/logs":
             self._send(json.dumps(WORKFLOW.logger.read(), ensure_ascii=False), content_type="application/json")
         else:
-            self._send("Not found", 404, "text/plain; charset=utf-8")
+            relative = "index.html" if request_path == "/" else request_path.lstrip("/")
+            candidate = (WEB_ROOT / relative).resolve()
+            if WEB_ROOT.resolve() not in candidate.parents and candidate != WEB_ROOT.resolve():
+                self._send("Not found", 404, "text/plain; charset=utf-8")
+                return
+            if not candidate.is_file():
+                self._send("Not found", 404, "text/plain; charset=utf-8")
+                return
+            content_type = mimetypes.guess_type(candidate.name)[0] or "application/octet-stream"
+            if content_type.startswith("text/") or content_type in {"application/javascript", "application/json"}:
+                content_type += "; charset=utf-8"
+            body = candidate.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
     def do_POST(self) -> None:
         if self.path != "/api/query":
@@ -44,7 +65,11 @@ class Handler(BaseHTTPRequestHandler):
             query = str(payload.get("query", "")).strip()
             if not query:
                 raise ValueError("query is required")
-            state = MAS.invoke(query, request_id=payload.get("request_id") or "req_http", context=payload.get("context"), history=payload.get("history"), profile=payload.get("profile"))
+            request_id = payload.get("request_id") or "req_http"
+            if MAS:
+                state = MAS.invoke(query, request_id=request_id, context=payload.get("context"), history=payload.get("history"), profile=payload.get("profile"))
+            else:
+                state = WORKFLOW.answer(query, request_id=request_id, context=payload.get("context"), history=payload.get("history"), profile=payload.get("profile"))
             result = {"request_id": state["request_id"], "response": state.get("response", ""), "evidence": state.get("evidence", []), "validation": state.get("validation", {}), "orchestration": state.get("orchestration", {}), "prompt_xml": state.get("prompt_xml", ""), "system_prompt": state.get("system_prompt", ""), "user_prompt": state.get("user_prompt", ""), "sources": [WORKFLOW.kb.sources[item["source_id"]].__dict__ for item in state.get("evidence", [])]}
             self._send(json.dumps(result, ensure_ascii=False), content_type="application/json")
         except (ValueError, json.JSONDecodeError) as error:
