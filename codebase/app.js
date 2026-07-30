@@ -72,7 +72,7 @@ const pages = {
   },
   schedule: {
     title: "Lịch tuyển sinh",
-    intro: "Các mốc quan trọng từ mở đơn đến khai giảng.",
+    intro: "Theo dõi tiến độ tuyển sinh theo từng khóa. Mỗi khóa được đào tạo trong 12 tuần.",
     body: schedulePage,
   },
   application: {
@@ -375,24 +375,64 @@ function benefitsPage() {
 
 function schedulePage() {
   const steps = [
-    ["01/06/2026", "Mở đơn đăng ký"],
-    ["30/07/2026", "Hạn đăng ký"],
-    ["10/08/2026", "Kiểm tra đầu vào"],
-    ["17/08/2026", "Phỏng vấn"],
-    ["24/08/2026", "Thông báo kết quả"],
-    ["03/09/2026", "Khai giảng"],
+    ["Bước 1", "Mở đơn đăng ký"],
+    ["Bước 2", "Xét hồ sơ trực tuyến"],
+    ["Bước 3", "Đánh giá năng lực đầu vào"],
+    ["Bước 4", "Thông báo kết quả"],
+    ["Bước 5", "Khai giảng và đào tạo 12 tuần"],
   ];
   return `
+    <section class="schedule-overview">
+      <article class="current-cohort">
+        <div>
+          <span class="cohort-label">Khóa gần nhất</span>
+          <h2>Khóa 4</h2>
+          <p>Lịch nhận hồ sơ, đánh giá đầu vào và khai giảng đang được cập nhật theo thông báo chính thức của chương trình.</p>
+        </div>
+        <div class="duration-badge">
+          <strong>12</strong>
+          <span>tuần đào tạo</span>
+        </div>
+      </article>
+      <aside class="schedule-note">
+        ${icon("calendar")}
+        <div>
+          <strong>Lịch có thể được điều chỉnh</strong>
+          <p>Các mốc tuyển sinh không cố định giữa các khóa. Ứng viên nên kiểm tra thông báo mới nhất hoặc liên hệ đội ngũ tuyển sinh trước khi chuẩn bị hồ sơ.</p>
+        </div>
+      </aside>
+    </section>
     <section class="content-card schedule-card">
+      <div class="schedule-section-head">
+        <div>
+          <span class="contact-kicker">Quy trình dự kiến</span>
+          <h2>Các bước của một đợt tuyển sinh</h2>
+        </div>
+        <a class="secondary-btn" href="#contact">Kiểm tra lịch mới nhất</a>
+      </div>
       <div class="timeline">
-        ${steps.map(([date, label], index) => `
+        ${steps.map(([stage, label], index) => `
           <div class="timeline-item">
             <span class="timeline-dot">${index + 1}</span>
-            <div><strong>${label}</strong><p class="subtle">${date}</p></div>
+            <div><strong>${label}</strong><p class="subtle">${stage} · Thời gian sẽ được thông báo</p></div>
           </div>
         `).join("")}
       </div>
-      <a class="primary-btn" href="#application">Đăng ký ngay</a>
+      <a class="primary-btn" href="#application">Đăng ký quan tâm</a>
+    </section>
+    <section class="content-card cohort-history">
+      <div>
+        <span class="contact-kicker">Các khóa đã công bố</span>
+        <h2>Chương trình hiện hiển thị đến Khóa 4</h2>
+      </div>
+      <div class="cohort-list">
+        ${[1, 2, 3, 4].map((cohort) => `
+          <div class="cohort-item ${cohort === 4 ? "active" : ""}">
+            <span>Khóa ${cohort}</span>
+            <strong>${cohort === 4 ? "Khóa gần nhất" : "Khóa trước"}</strong>
+          </div>
+        `).join("")}
+      </div>
     </section>
   `;
 }

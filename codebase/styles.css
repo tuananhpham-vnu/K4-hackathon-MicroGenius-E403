@@ -737,6 +737,109 @@ p {
   max-width: 520px;
 }
 
+.schedule-overview {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  gap: 18px;
+}
+
+.current-cohort {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  padding: 30px;
+  color: #fff;
+  background: #153f96;
+  border-radius: 8px;
+}
+
+.current-cohort h2 {
+  margin: 7px 0 8px;
+  font-size: 32px;
+}
+
+.current-cohort p {
+  max-width: 610px;
+  margin: 0;
+  color: #dbe6ff;
+  line-height: 1.6;
+}
+
+.cohort-label {
+  color: #a8c1ff;
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.duration-badge {
+  width: 132px;
+  min-height: 112px;
+  display: grid;
+  place-content: center;
+  flex: 0 0 132px;
+  text-align: center;
+  color: #153f96;
+  background: #fff;
+  border-radius: 8px;
+}
+
+.duration-badge strong,
+.duration-badge span {
+  display: block;
+}
+
+.duration-badge strong {
+  font-size: 42px;
+  line-height: 1;
+}
+
+.duration-badge span {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.schedule-note {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  gap: 14px;
+  align-content: center;
+  padding: 24px;
+  background: #fff8df;
+  border: 1px solid #f1dda0;
+  border-radius: 8px;
+}
+
+.schedule-note > .ui-icon {
+  width: 42px;
+  height: 42px;
+  padding: 10px;
+  color: #8b6511;
+  background: #ffedac;
+  border-radius: 8px;
+}
+
+.schedule-note p {
+  margin: 7px 0 0;
+  color: #685a38;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.schedule-section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 26px;
+}
+
+.schedule-section-head h2 {
+  margin: 7px 0 0;
+}
+
 .timeline-item {
   display: grid;
   grid-template-columns: 42px 1fr;
@@ -765,6 +868,56 @@ p {
   width: 2px;
   height: 48px;
   background: #d9e1fb;
+}
+
+.cohort-history {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.7fr) minmax(0, 1.3fr);
+  gap: 28px;
+  align-items: center;
+}
+
+.cohort-history h2 {
+  margin: 7px 0 0;
+  font-size: 22px;
+}
+
+.cohort-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.cohort-item {
+  min-height: 82px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  padding: 14px;
+  background: #f7f9ff;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.cohort-item span {
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.cohort-item strong {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cohort-item.active {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.cohort-item.active span,
+.cohort-item.active strong {
+  color: #fff;
 }
 
 .contact-grid {
@@ -1172,6 +1325,8 @@ p {
   .suggestions,
   .metric-strip,
   .home-contact,
+  .schedule-overview,
+  .cohort-history,
   .two-cols,
   .benefit-grid,
   .job-grid,
@@ -1179,6 +1334,25 @@ p {
   .split-card,
   .contact-grid {
     grid-template-columns: 1fr;
+  }
+
+  .current-cohort {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .duration-badge {
+    width: 100%;
+    min-height: 88px;
+    flex-basis: auto;
+  }
+
+  .cohort-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .schedule-section-head {
+    display: grid;
   }
 
   .feedback-summary,
