@@ -1,0 +1,26 @@
+# Core API and configuration
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+
+# Multi-agent orchestration and LLM provider
+langgraph
+langchain-core
+langchain-openai
+openai
+
+# Retrieval and document ingestion
+qdrant-client
+PyMuPDF
+
+# PostgreSQL persistence (sessions, profiles, evidence, audit logs)
+psycopg[binary]
+
+# Evaluation and tests
+ragas
+pytest
+
+# Optional tracing/observability used by the agent workflow
+opentelemetry-api
+opentelemetry-sdk

@@ -107,6 +107,79 @@ Validator Agent
 | Human Reviewer | Cán bộ tuyển sinh phê duyệt, chỉnh sửa, yêu cầu tìm thêm hoặc từ chối câu trả lời. |
 | Synthesis Agent | Tổng hợp câu trả lời cuối cùng, trích nguồn và gợi ý bước tiếp theo. |
 
+### 2.1. Agent Harness Runtime
+
+Mọi agent chạy bên trong `Agent Harness`. LLM chỉ thực hiện reasoning theo prompt; Harness quyết định agent được phép dùng tool nào, được đọc memory nào, phải áp dụng guardrail nào và có được phép trả output hay không.
+
+| Harness capability | Feature | Quy tắc |
+|---|---|---|
+| `policy_planning` | Tạo `HarnessPlan` cho từng agent | Gồm `reasoning_mode`, `allowed_tools`, `memory_scopes`, `guardrails`. |
+| `tool_registry` | Đăng ký và gọi tool | Agent chỉ được gọi tool nằm trong `allowed_tools`; gọi ngoài policy phải bị từ chối. |
+| `memory_store` | Lưu/đọc session memory | Memory phải scope theo `session_id`; production có thể thay adapter bằng PostgreSQL/Redis. |
+| `input_guardrail` | Kiểm tra query trước reasoning | Query rỗng, sai schema hoặc có dấu hiệu rủi ro phải được chặn/định tuyến lại. |
+| `evidence_guardrail` | Kiểm tra source và relevance | Evidence thiếu `source_id`, source không được duyệt hoặc dưới ngưỡng không được synthesis. |
+| `output_guardrail` | Kiểm tra câu trả lời cuối | Phải có grounding/citation; case rủi ro cao phải nêu chuyển cán bộ tuyển sinh. |
+| `audit` | Ghi quyết định runtime | Lưu plan, tool call, memory scope, guardrail result và route của agent. |
+
+Harness không thay thế LangGraph. LangGraph quản lý state và routing; Harness quản lý quyền hạn và điều kiện runtime của từng agent.
+
+#### 2.1.1. Observability và step logging
+
+Mỗi request phải tạo structured trace theo JSONL. `request_id` là khóa nối toàn bộ execution path từ lúc nhận query đến khi trả lời.
+
+Các event tối thiểu:
+
+| `step` | `component` | Nội dung cần log |
+|---|---|---|
+| `request_start` | `workflow` | Query, session/context tối thiểu và timestamp. |
+| `harness_plan` | Tên agent | `reasoning_mode`, `allowed_tools`, `memory_scopes`, `guardrails`. |
+| Tên agent | `workflow` | Input/output chính của Orchestrator, Analyst, Searcher, Validator, HITL và Synthesis. |
+| `tool_call` | Tên agent | Tên tool, query/arguments đã được sanitize và số lượng kết quả. |
+| `guardrail` | Harness | Kết quả check, lý do block hoặc route lại. |
+| `request_end` | `workflow` | Status, citation count, latency/error nếu có. |
+
+Prototype ghi log tại `logs/mas.jsonl`, in tóm tắt từng bước ra console và expose `GET /api/logs`. Không ghi secret, API key hoặc dữ liệu cá nhân nhạy cảm vào payload log. Production nên chuyển adapter này sang OpenTelemetry/LangSmith và giữ retention policy riêng.
+
+### 2.2. Feature contract của từng agent
+
+| Agent | Input chính | Reasoning/features | Tools được phép | Memory scope | Guardrails | Output/route |
+|---|---|---|---|---|---|---|
+| Orchestrator | `query`, `history`, `context`, profile | Phân loại intent, chấm clarity/risk, nhận diện chitchat, chọn bước tiếp theo | Không dùng tool ở MVP | `session` | Input validation, risk detection | `orchestration`, route Analyst/Synthesis/HITL |
+| Summarizer | History dài, confirmed facts | Nén hội thoại, giữ facts đã xác nhận, câu hỏi chưa giải quyết | Memory read | `session`, `candidate_profile` | Không tạo fact mới, giữ uncertainty | Summary state cho Analyst |
+| Admissions Analyst | Query, history, profile | Trích xuất entity, phát hiện missing fields, rewrite query, tạo sub-task | Không dùng tool ở MVP | `session`, `candidate_profile` | Không suy diễn thông tin hồ sơ | `analysis`, route Searcher hoặc hỏi lại |
+| Searcher | Rewritten query, sub-task | Chia sub-query, tìm chunk, lưu source metadata, chấm relevance sơ bộ | `knowledge_base.search`, `source_registry.lookup` | `session` | Chỉ approved source, bắt buộc source trace | Evidence list hoặc retry/HITL |
+| Program Matcher | Profile, validated evidence | So khớp requirement, phân loại `suitable`/`potentially_suitable`/`insufficient_information`/`unlikely_suitable` | `source_registry.lookup` | `candidate_profile`, `session` | Không trả `accepted`/`rejected` | Fit assessment có evidence IDs |
+| Validator | Evidence, original query, matching result | Kiểm completeness, trust, relevance, consistency, freshness và unsupported claims | `source_registry.lookup` | `session`, `audit` | `source_trust_score`, `relevance_score`, citation | `pass`, retry hoặc HITL |
+| HITL Gate | Validation, risk, policy flags | Kết hợp rule-based và human review requirement | Không dùng LLM tool tự quyết | `session`, `audit` | High-risk bắt buộc human | `pending_human_review`, approve/edit/request retrieval |
+| Synthesis | Validated evidence, approved human result | Viết câu trả lời, citation, giới hạn dữ liệu, next step | Không tự search dữ liệu mới; chỉ lookup source | `session`, `candidate_profile` | Citation, no decision, output safety | Final response hoặc HITL notice |
+
+Trong MVP hiện tại, `Summarizer` và `Program Matcher` đã có contract trong framework nhưng chưa được nối thành node mặc định của graph; chúng được kích hoạt khi có hội thoại dài hoặc intent `program_recommendation`. Các node đã nối trong LangGraph gồm Orchestrator, Analyst, Searcher, Validator, HITL Gate và Synthesis.
+
+### 2.3. LangGraph state contract
+
+State dùng chung giữa các node phải giữ tối thiểu:
+
+```python
+{
+    "request_id": "req_...",
+    "query": "...",
+    "context": {},
+    "history": [],
+    "profile": {},
+    "orchestration": {},
+    "analysis": {},
+    "evidence": [],
+    "validation": {},
+    "harness_plan": {},
+    "guardrail_result": {},
+    "retry_count": 0,
+    "human_required": False,
+    "response": "..."
+}
+```
+
+Mỗi node phải giữ `request_id`, không ghi đè evidence đã có source, và ghi audit sau khi hoàn thành. Validator có thể quay lại Searcher tối đa một vòng retry trong MVP; sau đó chuyển HITL hoặc synthesis có cảnh báo.
+
 ---
 
 ## 3. Luồng xử lý chi tiết
@@ -288,7 +361,7 @@ Quy tắc chấm điểm liên quan:
 - `0.2 - 0.49`: evidence chỉ liên quan gián tiếp, không đủ dùng làm căn cứ chính.
 - `< 0.2`: evidence không phù hợp, loại khỏi phần tổng hợp.
 
-Searcher chỉ chuyển sang Validator các evidence có `approval_status` khác `rejected`, `source_trust_score >= 0.7` và `query_relevance_score >= 0.5`. Nếu không có evidence đạt ngưỡng, Searcher phải trả trạng thái thiếu dữ liệu hoặc yêu cầu tìm nguồn chính thức hơn.
+Searcher chỉ chuyển sang Validator các evidence có `approval_status` khác `rejected`, `source_trust_score >= 0.7` và relevance đạt ngưỡng cấu hình. Trong prototype hiện tại, field runtime là `relevance_score` và ngưỡng tối thiểu là `0.35`; schema production chuẩn hóa tên thành `query_relevance_score` và có thể nâng ngưỡng lên `0.5` cho claim quan trọng. Nếu không có evidence đạt ngưỡng, Searcher phải trả trạng thái thiếu dữ liệu hoặc yêu cầu tìm nguồn chính thức hơn.
 
 Ví dụ evidence output:
 
@@ -523,7 +596,7 @@ Nếu mục tiêu là prototype trong thời gian ngắn, nên chọn:
 
 - Frontend: Next.js + Tailwind CSS.
 - Backend: FastAPI.
-- Agent workflow: LangGraph.
+- Agent workflow: LangGraph + Agent Harness nội bộ.
 - Database: PostgreSQL + pgvector.
 - Document parsing: PyMuPDF hoặc docling.
 - Evaluation: bộ test set thủ công + Ragas.
