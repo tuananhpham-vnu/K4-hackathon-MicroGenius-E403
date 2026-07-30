@@ -1,0 +1,273 @@
+{
+  "total": 20,
+  "passed": 20,
+  "pass_rate": 1.0,
+  "quality_bar": 0.8,
+  "quality_bar_met": true,
+  "results": [
+    {
+      "id": "G01",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 4
+    },
+    {
+      "id": "G02",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "tuition_and_scholarship",
+      "actual_human": false,
+      "evidence_count": 4
+    },
+    {
+      "id": "G03",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "deadline_information",
+      "actual_human": false,
+      "evidence_count": 4
+    },
+    {
+      "id": "G04",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "application_process",
+      "actual_human": false,
+      "evidence_count": 7
+    },
+    {
+      "id": "G05",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "admission_requirements",
+      "actual_human": false,
+      "evidence_count": 2
+    },
+    {
+      "id": "G06",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 7
+    },
+    {
+      "id": "G07",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "tuition_and_scholarship",
+      "actual_human": false,
+      "evidence_count": 5
+    },
+    {
+      "id": "G08",
+      "category": "happy_path",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 1
+    },
+    {
+      "id": "G09",
+      "category": "low_confidence",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true,
+        "clarification": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 3
+    },
+    {
+      "id": "G10",
+      "category": "low_confidence",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true,
+        "clarification": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 1
+    },
+    {
+      "id": "G11",
+      "category": "low_confidence",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true,
+        "clarification": true
+      },
+      "actual_intent": "program_recommendation",
+      "actual_human": false,
+      "evidence_count": 2
+    },
+    {
+      "id": "G12",
+      "category": "low_confidence",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true,
+        "clarification": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": false,
+      "evidence_count": 2
+    },
+    {
+      "id": "G13",
+      "category": "high_risk",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": true,
+      "evidence_count": 0
+    },
+    {
+      "id": "G14",
+      "category": "high_risk",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "admission_requirements",
+      "actual_human": true,
+      "evidence_count": 1
+    },
+    {
+      "id": "G15",
+      "category": "high_risk",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": true,
+      "evidence_count": 4
+    },
+    {
+      "id": "G16",
+      "category": "high_risk",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "program_information",
+      "actual_human": true,
+      "evidence_count": 8
+    },
+    {
+      "id": "G17",
+      "category": "out_of_scope",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "out_of_scope",
+      "actual_human": false,
+      "evidence_count": 0
+    },
+    {
+      "id": "G18",
+      "category": "out_of_scope",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "out_of_scope",
+      "actual_human": false,
+      "evidence_count": 0
+    },
+    {
+      "id": "G19",
+      "category": "out_of_scope",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "out_of_scope",
+      "actual_human": false,
+      "evidence_count": 0
+    },
+    {
+      "id": "G20",
+      "category": "chitchat",
+      "passed": true,
+      "checks": {
+        "intent": true,
+        "human_route": true,
+        "evidence": true
+      },
+      "actual_intent": "chitchat",
+      "actual_human": false,
+      "evidence_count": 0
+    }
+  ]
+}

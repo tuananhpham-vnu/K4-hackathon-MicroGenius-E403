@@ -65,7 +65,7 @@ class LangGraphAdmissionsMAS:
         graph.add_edge(START, "orchestrator")
         graph.add_conditional_edges(
             "orchestrator",
-            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] else "analyst",
+            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] or state["orchestration"]["is_out_of_scope"] else "analyst",
             {"analyst": "analyst", "synthesis": "synthesis"},
         )
         graph.add_edge("analyst", "searcher")
@@ -103,7 +103,7 @@ class LangGraphAdmissionsMAS:
         plan = self._harness_context("searcher", state)
         # On retry, use the original query plus the failed validation reasons
         # to broaden retrieval without losing the original query trace.
-        query = state["analysis"]["rewritten_query"]
+        query = state["analysis"]["retrieval_query"]
         if state.get("retry_count", 0):
             query += " " + " ".join(state.get("validation", {}).get("rejection_reasons", []))
         evidence = self.harness.invoke_tool("searcher", "knowledge_base.search", state, query=query, limit=8)
@@ -136,14 +136,19 @@ class LangGraphAdmissionsMAS:
     def synthesis_node(self, state: MASState) -> dict[str, Any]:
         plan = self._harness_context("synthesis", state)
         evidence = [item for item in state.get("evidence", []) if item["source_check_passed"] and item["relevance_score"] >= 0.35]
+        validation = state.get("validation", {})
         if state["orchestration"]["is_chitchat"]:
             response = "Chào bạn. Mình có thể hỗ trợ tra cứu thông tin chương trình và hướng dẫn hồ sơ."
+        elif state["orchestration"]["is_out_of_scope"]:
+            response = "Mình không thể thực hiện yêu cầu đó. Mình chỉ hỗ trợ tra cứu và tư vấn thông tin tuyển sinh từ nguồn đã được phê duyệt."
+        elif state["orchestration"]["need_clarification"]:
+            response = "Mình cần thêm thông tin để tra cứu chính xác. Bạn vui lòng nêu rõ khóa học, mốc thời gian hoặc nội dung tuyển sinh bạn muốn hỏi."
         elif not evidence:
             response = "Mình chưa tìm thấy bằng chứng đủ tin cậy cho câu hỏi này. Bạn vui lòng cung cấp thêm chi tiết hoặc chờ cán bộ tuyển sinh xác nhận."
         else:
             snippets = " ".join(item["quote"] for item in evidence[:3])
             response = f"Theo các tài liệu hiện có, thông tin liên quan là: {snippets[:900]} Đây là tư vấn tham khảo dựa trên dữ liệu cục bộ, không phải quyết định tuyển sinh."
-        if state.get("human_required") or state["validation"].get("needs_human"):
+        if state.get("human_required") or validation.get("needs_human"):
             response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
         prompt_xml = XmlPrompt.build(state["request_id"], state["query"], state.get("context"), state.get("history"), state.get("profile"), [Evidence(**item) for item in evidence])
         messages = prompt_messages(request_id=state["request_id"], agent="synthesis", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"), evidence=[Evidence(**item) for item in evidence])

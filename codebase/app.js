@@ -215,7 +215,7 @@ function dashboardShell(active, content) {
 
 function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng ký chương trình AI Thực Chiến được không?") {
   return dashboardShell("chat", `
-    <section class="chat-layout">
+    <section class="chat-layout" data-live-chat data-initial-question="${escapeHtml(initialQuestion)}">
       <div class="chat-panel">
         <header class="panel-header">
           <div class="panel-title">
@@ -230,18 +230,8 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
           </div>
           <div class="message-row">
             <div class="avatar">AI</div>
-            <article class="bubble">
-              <h3>Có. Bạn hoàn toàn có thể đăng ký nếu đáp ứng các điều kiện của chương trình.</h3>
-              <p>Chương trình AI Thực Chiến chào đón ứng viên từ nhiều ngành học, miễn là bạn có nền tảng tư duy logic, động lực học rõ ràng và sẵn sàng dành thời gian thực hành.</p>
-              <strong>Điều kiện chính</strong>
-              <ul class="check-list">
-                <li>Tốt nghiệp đại học hoặc sắp tốt nghiệp.</li>
-                <li>Có tư duy logic và khả năng giải quyết vấn đề.</li>
-                <li>Có kinh nghiệm lập trình hoặc phân tích dữ liệu là lợi thế.</li>
-                <li>Vượt qua bài kiểm tra đầu vào và vòng phỏng vấn.</li>
-              </ul>
-              <p>Nhiều học viên từ Kinh tế, Tài chính, Marketing có thể phát triển sự nghiệp AI tốt nếu chuẩn bị phần nền tảng trước khoá.</p>
-              <button class="source-toggle" type="button" data-show-sources>Xem nguồn (4)</button>
+            <article class="bubble" data-ai-answer aria-live="polite">
+              <p>Đang tra cứu nguồn tuyển sinh đã kiểm duyệt…</p>
             </article>
           </div>
         </div>
@@ -261,15 +251,7 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
       </div>
       <aside class="resource-panel" id="source-panel" tabindex="-1">
         <h3>Nguồn tham khảo</h3>
-        <div class="source-list">
-          ${sources.map(([title, host]) => `
-            <div class="source-card">
-              <span class="page-icon">S</span>
-              <span><strong>${title}</strong><span>${host}</span></span>
-              <span>↗</span>
-            </div>
-          `).join("")}
-        </div>
+        <div class="source-list" data-live-sources><p class="subtle">Nguồn sẽ xuất hiện sau khi agent trả lời.</p></div>
         <h3>Chủ đề phổ biến</h3>
         <div class="topic-list">
           ${topics.map((topic) => `
@@ -284,6 +266,76 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
       </aside>
     </section>
   `);
+}
+
+async function runChat(question) {
+  const shell = document.querySelector("[data-live-chat]");
+  if (!shell) return;
+  const answer = shell.querySelector("[data-ai-answer]");
+  const sourceList = shell.querySelector("[data-live-sources]");
+  answer.innerHTML = "<p>Đang tra cứu nguồn tuyển sinh đã kiểm duyệt…</p>";
+  sourceList.innerHTML = '<p class="subtle">Đang kiểm tra nguồn và độ liên quan…</p>';
+
+  try {
+    const response = await fetch("/api/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: question,
+        request_id: `web_${Date.now()}`,
+        context: { session_id: sessionStorage.getItem("admission-session") || "web-demo" },
+      }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Không thể gọi dịch vụ tư vấn");
+
+    const validation = data.validation || {};
+    const status = validation.passed
+      ? `Đã kiểm chứng ${validation.evidence_count || 0} bằng chứng`
+      : "Chưa đủ bằng chứng — cần tư vấn viên";
+    answer.innerHTML = `
+      <p>${escapeHtml(data.response)}</p>
+      <p class="subtle">${escapeHtml(status)}</p>
+      <button class="source-toggle" type="button" data-show-sources>
+        Xem nguồn (${(data.sources || []).length})
+      </button>
+    `;
+    const evidenceBySource = new Map((data.evidence || []).map((item) => [item.source_id, item]));
+    const uniqueSources = [...new Map((data.sources || []).map((source) => [source.source_id, source])).values()];
+    sourceList.innerHTML = uniqueSources.length
+      ? uniqueSources.map((source) => `
+          <div class="source-card">
+            <span class="page-icon">S</span>
+            <span>
+              <strong>${escapeHtml(source.title)}</strong>
+              <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)}</span>
+            </span>
+          </div>
+        `).join("")
+      : '<p class="subtle">Không có nguồn đủ ngưỡng để trích dẫn.</p>';
+    bindSourceButton();
+  } catch (error) {
+    answer.innerHTML = `
+      <p>Không thể kết nối tới agent. Hãy chạy ứng dụng bằng <strong>python src/server.py</strong> rồi thử lại.</p>
+      <p class="subtle">${escapeHtml(error.message)}</p>
+    `;
+    sourceList.innerHTML = '<p class="subtle">Chưa tải được nguồn.</p>';
+  }
+}
+
+function bindSourceButton() {
+  const sourceButton = document.querySelector("[data-show-sources]");
+  if (!sourceButton || sourceButton.dataset.bound === "true") return;
+  sourceButton.dataset.bound = "true";
+  sourceButton.addEventListener("click", () => {
+    const sourcePanel = document.getElementById("source-panel");
+    if (!sourcePanel) return;
+    sourcePanel.classList.remove("attention");
+    requestAnimationFrame(() => sourcePanel.classList.add("attention"));
+    sourcePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+    sourcePanel.focus({ preventScroll: true });
+    sourceButton.textContent = "Đã mở danh sách nguồn";
+  });
 }
 
 function contentPage(id) {
@@ -603,6 +655,10 @@ function render() {
   }
 
   bindInteractions();
+  const liveChat = document.querySelector("[data-live-chat]");
+  if (liveChat) {
+    runChat(liveChat.dataset.initialQuestion);
+  }
 }
 
 function bindInteractions() {
@@ -613,7 +669,11 @@ function bindInteractions() {
       if (question && String(question).trim()) {
         sessionStorage.setItem("admission-question", String(question).trim());
       }
-      window.location.hash = "chat";
+      if (window.location.hash === "#chat") {
+        render();
+      } else {
+        window.location.hash = "chat";
+      }
     });
   });
 
@@ -692,18 +752,7 @@ function bindInteractions() {
     });
   });
 
-  const sourceButton = document.querySelector("[data-show-sources]");
-  if (sourceButton) {
-    sourceButton.addEventListener("click", () => {
-      const sourcePanel = document.getElementById("source-panel");
-      if (!sourcePanel) return;
-      sourcePanel.classList.remove("attention");
-      requestAnimationFrame(() => sourcePanel.classList.add("attention"));
-      sourcePanel.scrollIntoView({ behavior: "smooth", block: "start" });
-      sourcePanel.focus({ preventScroll: true });
-      sourceButton.textContent = "Đã mở danh sách nguồn";
-    });
-  }
+  bindSourceButton();
 
   document.querySelectorAll("[data-rating]").forEach((button) => {
     button.addEventListener("click", () => {
