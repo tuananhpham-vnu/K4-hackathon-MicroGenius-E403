@@ -30,6 +30,7 @@ function icon(name, className = "ui-icon") {
     upload: '<path d="M12 16V4M7 9l5-5 5 5"/><path d="M20 15v5H4v-5"/>',
     star: '<path d="m12 2 3 6 7 .9-5 4.8 1.3 6.8L12 17l-6.3 3.5L7 13.7 2 8.9 9 8z"/>',
     menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    check: '<circle cx="12" cy="12" r="9"/><path d="m8 12 2.5 2.5L16 9"/>',
   };
   return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.help}</svg>`;
 }
@@ -240,7 +241,7 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
                 <li>Vượt qua bài kiểm tra đầu vào và vòng phỏng vấn.</li>
               </ul>
               <p>Nhiều học viên từ Kinh tế, Tài chính, Marketing có thể phát triển sự nghiệp AI tốt nếu chuẩn bị phần nền tảng trước khoá.</p>
-              <span class="source-toggle">Xem nguồn (4)</span>
+              <button class="source-toggle" type="button" data-show-sources>Xem nguồn (4)</button>
             </article>
           </div>
         </div>
@@ -258,7 +259,7 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
           <button class="send-round" type="submit" aria-label="Gửi câu hỏi">➜</button>
         </form>
       </div>
-      <aside class="resource-panel">
+      <aside class="resource-panel" id="source-panel" tabindex="-1">
         <h3>Nguồn tham khảo</h3>
         <div class="source-list">
           ${sources.map(([title, host]) => `
@@ -440,18 +441,18 @@ function schedulePage() {
 function applicationPage() {
   return `
     <section class="contact-grid">
-      <form class="content-card form">
+      <form class="content-card form" data-application-form>
         <h2>Thông tin đăng ký</h2>
-        <input placeholder="Họ và tên" />
-        <input placeholder="Email" />
-        <input placeholder="Số điện thoại" />
-        <select>
-          <option>Mục tiêu học tập</option>
+        <input name="fullName" placeholder="Họ và tên" required />
+        <input name="email" type="email" placeholder="Email" required />
+        <input name="phone" type="tel" placeholder="Số điện thoại" required />
+        <select name="goal" required>
+          <option value="">Mục tiêu học tập</option>
           <option>Chuyển ngành sang AI</option>
           <option>Ứng dụng AI trong công việc</option>
           <option>Nâng cấp năng lực kỹ thuật</option>
         </select>
-        <textarea placeholder="Bạn muốn agent tư vấn thêm điều gì?"></textarea>
+        <textarea name="question" placeholder="Bạn muốn agent tư vấn thêm điều gì?"></textarea>
         <label class="upload-box" for="cv-upload">
           ${icon("upload", "upload-icon")}
           <span>
@@ -461,7 +462,8 @@ function applicationPage() {
           <span class="secondary-btn">Chọn tệp</span>
         </label>
         <input class="visually-hidden" id="cv-upload" name="cv" type="file" accept=".pdf,.doc,.docx" />
-        <button class="primary-btn" type="button">Gửi hồ sơ</button>
+        <p class="form-error" data-application-error role="alert"></p>
+        <button class="primary-btn" type="submit">Gửi hồ sơ</button>
       </form>
       <div class="application-guide">
         <article class="content-card guide-card">
@@ -545,7 +547,7 @@ function feedbackPage() {
         </article>
       `).join("")}
     </section>
-    <form class="content-card feedback-form">
+    <form class="content-card feedback-form" data-demo-form data-success-message="Phản hồi đã được ghi nhận trong bản demo và đang chờ kiểm duyệt.">
       <div>
         <span class="contact-kicker">Chia sẻ trải nghiệm</span>
         <h2>Gửi phản hồi của bạn</h2>
@@ -554,10 +556,10 @@ function feedbackPage() {
       <div class="rating-control" aria-label="Chọn mức đánh giá">
         ${[1, 2, 3, 4, 5].map((value) => `<button type="button" data-rating="${value}" aria-label="${value} sao">${icon("star")}</button>`).join("")}
       </div>
-      <input placeholder="Họ và tên" />
-      <input placeholder="Khóa học / vai trò" />
-      <textarea placeholder="Chia sẻ điều bạn thấy hữu ích hoặc mong muốn chương trình cải thiện..."></textarea>
-      <button class="primary-btn" type="button">Gửi phản hồi</button>
+      <input name="fullName" placeholder="Họ và tên" required />
+      <input name="role" placeholder="Khóa học / vai trò" required />
+      <textarea name="feedback" placeholder="Chia sẻ điều bạn thấy hữu ích hoặc mong muốn chương trình cải thiện..." required></textarea>
+      <button class="primary-btn" type="submit">Gửi phản hồi</button>
     </form>
   `;
 }
@@ -577,12 +579,12 @@ function contactPage() {
           <p>${icon("mail")}<span><strong>Email</strong><a href="mailto:AIthucchien@vinuni.edu.vn">AIthucchien@vinuni.edu.vn</a></span></p>
         </div>
       </article>
-      <form class="content-card form">
+      <form class="content-card form" data-demo-form data-success-message="Yêu cầu gọi lại đã được ghi nhận trong bản demo.">
         <h2>Yêu cầu tư vấn viên gọi lại</h2>
-        <input placeholder="Họ và tên" />
-        <input placeholder="Số điện thoại" />
-        <textarea placeholder="Nội dung cần tư vấn"></textarea>
-        <button class="primary-btn" type="button">Gửi yêu cầu</button>
+        <input name="fullName" placeholder="Họ và tên" required />
+        <input name="phone" type="tel" placeholder="Số điện thoại" required />
+        <textarea name="request" placeholder="Nội dung cần tư vấn" required></textarea>
+        <button class="primary-btn" type="submit">Gửi yêu cầu</button>
       </form>
     </section>
   `;
@@ -626,9 +628,80 @@ function bindInteractions() {
   if (upload) {
     upload.addEventListener("change", () => {
       const label = document.querySelector("[data-file-name]");
+      const uploadBox = document.querySelector(".upload-box");
+      const error = document.querySelector("[data-application-error]");
       if (label && upload.files.length) {
         label.textContent = upload.files[0].name;
       }
+      uploadBox?.classList.remove("invalid");
+      if (error) error.textContent = "";
+    });
+  }
+
+  const applicationForm = document.querySelector("[data-application-form]");
+  if (applicationForm) {
+    applicationForm.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const error = applicationForm.querySelector("[data-application-error]");
+      const uploadBox = applicationForm.querySelector(".upload-box");
+      const file = upload?.files?.[0];
+
+      if (!file) {
+        if (error) error.textContent = "Vui lòng chọn CV trước khi gửi hồ sơ.";
+        uploadBox?.classList.add("invalid");
+        uploadBox?.scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      }
+
+      if (file.size > 10 * 1024 * 1024) {
+        if (error) error.textContent = "CV vượt quá dung lượng tối đa 10 MB.";
+        uploadBox?.classList.add("invalid");
+        return;
+      }
+
+      applicationForm.innerHTML = `
+        <div class="completion-state">
+          <span class="completion-icon">${icon("check")}</span>
+          <span class="contact-kicker">Hoàn tất flow CP2</span>
+          <h2>Đã hoàn tất bước nộp hồ sơ</h2>
+          <p>Thông tin và tệp <strong>${escapeHtml(file.name)}</strong> đã được ghi nhận trong phiên demo.</p>
+          <div class="prototype-note">Đây là bản prototype. Dữ liệu chưa được gửi tới hệ thống tuyển sinh VinUni.</div>
+          <div class="completion-actions">
+            <a class="primary-btn" href="#chat">Tiếp tục hỏi agent</a>
+            <a class="secondary-btn" href="#home">Về trang chủ</a>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  document.querySelectorAll("[data-demo-form]").forEach((form) => {
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      let notice = form.querySelector(".form-notice");
+      if (!notice) {
+        notice = document.createElement("div");
+        notice.className = "form-notice";
+        notice.setAttribute("role", "status");
+        form.appendChild(notice);
+      }
+      notice.innerHTML = `${icon("check")}<span>${escapeHtml(form.dataset.successMessage)}</span>`;
+      form.reset();
+      form.querySelectorAll("[data-rating]").forEach((item) => item.classList.remove("selected"));
+      notice.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+
+  const sourceButton = document.querySelector("[data-show-sources]");
+  if (sourceButton) {
+    sourceButton.addEventListener("click", () => {
+      const sourcePanel = document.getElementById("source-panel");
+      if (!sourcePanel) return;
+      sourcePanel.classList.remove("attention");
+      requestAnimationFrame(() => sourcePanel.classList.add("attention"));
+      sourcePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+      sourcePanel.focus({ preventScroll: true });
+      sourceButton.textContent = "Đã mở danh sách nguồn";
     });
   }
 
