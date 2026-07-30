@@ -6,6 +6,7 @@ Dựa trên framework ViSecChat, có thể xây dựng một hệ thống multi-
 Phân tích câu hỏi
 -> Chia nhỏ truy vấn
 -> Tìm kiếm dữ liệu
+-> Kiểm tra nguồn và chấm điểm liên quan với user query
 -> Kiểm tra bằng chứng
 -> Tinh chỉnh khi thiếu/sai dữ liệu
 -> Tổng hợp câu trả lời
@@ -32,6 +33,7 @@ Xây dựng chatbot hỗ trợ ứng viên:
 Các nguyên tắc vận hành:
 
 - Chỉ trả lời dựa trên nguồn chính thức hoặc nguồn đã được phê duyệt.
+- Mọi thông tin truy xuất phải đi kèm kiểm tra nguồn và điểm liên quan với user query trước khi được dùng để tổng hợp câu trả lời.
 - Luôn phân biệt giữa tư vấn tham khảo và quyết định tuyển sinh.
 - Với thông tin không chắc chắn, phải nêu rõ giới hạn thay vì suy đoán.
 - Với trường hợp rủi ro cao, bắt buộc kích hoạt Human-in-the-Loop.
@@ -98,9 +100,9 @@ Validator Agent
 | Orchestrator Agent | Phân loại câu hỏi, đánh giá độ rõ ràng, mức rủi ro và chọn agent tiếp theo. |
 | Summarizer Agent | Tóm tắt hội thoại dài, giữ lại hồ sơ và nhu cầu quan trọng của ứng viên. |
 | Admissions Analyst Agent | Hiểu ý định, trích xuất thông tin ứng viên, phát hiện thông tin còn thiếu và viết lại truy vấn. |
-| Searcher Agent | Chia truy vấn thành sub-query, chọn công cụ tìm kiếm phù hợp và thu thập bằng chứng. |
+| Searcher Agent | Chia truy vấn thành sub-query, chọn công cụ tìm kiếm phù hợp, kiểm tra nguồn sơ bộ, chấm điểm liên quan và thu thập bằng chứng. |
 | Program Matching Agent | Đánh giá mức độ phù hợp giữa hồ sơ ứng viên và từng chương trình. |
-| Validator Agent | Kiểm tra độ đầy đủ, chính xác, cập nhật và nhất quán của bằng chứng. |
+| Validator Agent | Kiểm tra độ đầy đủ, chính xác, cập nhật, nhất quán, độ tin cậy nguồn và mức liên quan của bằng chứng với user query. |
 | HITL Gate | Quyết định trường hợp nào bắt buộc chuyển cho con người. |
 | Human Reviewer | Cán bộ tuyển sinh phê duyệt, chỉnh sửa, yêu cầu tìm thêm hoặc từ chối câu trả lời. |
 | Synthesis Agent | Tổng hợp câu trả lời cuối cùng, trích nguồn và gợi ý bước tiếp theo. |
@@ -142,6 +144,44 @@ Các intent chính:
 - `complaint`
 - `chitchat`
 - `out_of_domain`
+
+#### 3.1.1. XML Prompt Envelope
+
+Để dễ chuẩn hóa input, đánh số `id` và lưu nguồn, mọi agent nên nhận user prompt theo dạng XML thay vì chuỗi tự do. Mỗi lần gọi agent cần giữ nguyên các trường ngữ cảnh chính như `context`, `query`, `history`, `candidate_profile`, `retrieved_evidence` và `source_registry`.
+
+Mẫu khung prompt:
+
+```xml
+<request>
+  <request_id>req_20260730_0001</request_id>
+  <agent>searcher</agent>
+  <context>
+    <session_id>ses_123</session_id>
+    <conversation_goal>program_eligibility</conversation_goal>
+  </context>
+  <query>Em năm 3 ngành CNTT, mới học Python thì có vào được không?</query>
+  <history>
+    <turn id="1" role="user">...</turn>
+    <turn id="2" role="assistant">...</turn>
+  </history>
+  <candidate_profile>
+    <education_year>3</education_year>
+    <major>Công nghệ thông tin</major>
+    <python_level>basic</python_level>
+  </candidate_profile>
+  <retrieved_evidence>
+    <item id="ev_001" source_id="src_001" />
+    <item id="ev_002" source_id="src_002" />
+  </retrieved_evidence>
+</request>
+```
+
+Quy ước sử dụng XML:
+
+- `request_id`, `turn id`, `evidence id` và `source_id` phải là định danh duy nhất để trace end-to-end.
+- Trường nào có thể lưu thành metadata thì không nhét vào text tự do.
+- Khi cần truy xuất lại nguồn, hệ thống chỉ cần bám theo `source_id` thay vì parse lại toàn bộ câu trả lời.
+- Nếu có nhiều nguồn cho cùng một claim, mỗi nguồn giữ một `source_id` riêng để Validator và Human Reviewer đối chiếu.
 
 ### 3.2. Summarizer Agent
 
@@ -221,6 +261,56 @@ Thứ tự ưu tiên nguồn:
 
 Không dùng blog, bài đăng mạng xã hội hoặc nguồn không chính thức để kết luận về điều kiện tuyển sinh, học phí, học bổng hoặc ngoại lệ chính sách.
 
+Mọi thông tin lấy từ nguồn nào phải giữ lại đúng `source_id` của nguồn đó, không được chỉ lưu câu trả lời đã rút gọn. Mỗi evidence cần giữ cả nội dung trích xuất lẫn trace gốc để về sau:
+
+- truy ngược về tài liệu gốc;
+- gắn ID cho từng claim;
+- tạo citation ổn định;
+- đối chiếu khi nguồn có cập nhật hoặc mâu thuẫn.
+
+Với mỗi kết quả truy xuất, Searcher phải chuẩn hóa evidence và gắn metadata kiểm tra nguồn:
+
+- `source_type`: loại nguồn, ví dụ `official_policy`, `internal_program_db`, `official_website`, `approved_faq`, `admission_notice`.
+- `source_id`: định danh nguồn gốc để truy vết xuyên suốt.
+- `source_url` hoặc `document_id`: định danh nguồn để truy vết.
+- `source_owner`: đơn vị/cán bộ phụ trách nguồn nếu có.
+- `published_at` và `effective_from/effective_to`: ngày công bố và hiệu lực nếu có.
+- `approval_status`: `official`, `approved`, `unverified` hoặc `rejected`.
+- `source_trust_score`: điểm tin cậy nguồn từ 0 đến 1.
+- `query_relevance_score`: điểm liên quan giữa evidence và user query từ 0 đến 1.
+- `matched_query_terms`: các ý chính/entity trong user query được evidence hỗ trợ.
+- `unsupported_query_terms`: các ý chính/entity trong user query chưa được evidence hỗ trợ.
+
+Quy tắc chấm điểm liên quan:
+
+- `0.8 - 1.0`: evidence trả lời trực tiếp câu hỏi hoặc điều kiện chính trong user query.
+- `0.5 - 0.79`: evidence liên quan một phần, cần thêm nguồn để kết luận.
+- `0.2 - 0.49`: evidence chỉ liên quan gián tiếp, không đủ dùng làm căn cứ chính.
+- `< 0.2`: evidence không phù hợp, loại khỏi phần tổng hợp.
+
+Searcher chỉ chuyển sang Validator các evidence có `approval_status` khác `rejected`, `source_trust_score >= 0.7` và `query_relevance_score >= 0.5`. Nếu không có evidence đạt ngưỡng, Searcher phải trả trạng thái thiếu dữ liệu hoặc yêu cầu tìm nguồn chính thức hơn.
+
+Ví dụ evidence output:
+
+```json
+{
+  "evidence_id": "policy_01_chunk_03",
+  "source_id": "src_001",
+  "claim": "Ứng viên cần có nền tảng lập trình cơ bản để tham gia chương trình.",
+  "source_type": "official_policy",
+  "document_id": "vinai_ai_practical_admission_policy_2026",
+  "source_url": "https://example.edu/admissions/policy-2026",
+  "published_at": "2026-05-20",
+  "effective_from": "2026-06-01",
+  "effective_to": "2026-12-31",
+  "approval_status": "official",
+  "source_trust_score": 0.95,
+  "query_relevance_score": 0.86,
+  "matched_query_terms": ["sinh viên năm 3", "CNTT", "Python cơ bản"],
+  "unsupported_query_terms": ["kinh nghiệm AI/ML"]
+}
+```
+
 ### 3.5. Program Matching Agent
 
 Program Matching Agent chỉ được kích hoạt với các câu hỏi như:
@@ -268,11 +358,23 @@ Validator kiểm tra:
 
 - Bằng chứng có trả lời đủ câu hỏi không?
 - Nguồn có chính thức hoặc đã được phê duyệt không?
+- Nguồn có metadata truy vết rõ ràng không?
+- Điểm tin cậy nguồn có đạt ngưỡng không?
+- Điểm liên quan giữa evidence và user query có đạt ngưỡng không?
 - Văn bản còn hiệu lực không?
 - Các nguồn có mâu thuẫn không?
 - Kết luận của Program Matching có được bằng chứng hỗ trợ không?
 - Câu trả lời có vượt quá nội dung tài liệu không?
 - Có cần con người xác nhận không?
+
+Ngưỡng mặc định:
+
+- `source_trust_score >= 0.7` để evidence được dùng làm căn cứ.
+- `query_relevance_score >= 0.5` để evidence được giữ lại.
+- `query_relevance_score >= 0.8` cho các kết luận quan trọng như điều kiện tuyển sinh, học phí, học bổng, deadline và chính sách ngoại lệ.
+- Nếu evidence có nguồn chính thức nhưng điểm liên quan thấp, không được dùng để kết luận trực tiếp.
+- Nếu evidence liên quan cao nhưng nguồn chưa được phê duyệt, phải `retry_search` hoặc `hitl_required`.
+- Nếu cùng một claim xuất hiện từ nhiều nguồn, phải ưu tiên nguồn có `source_trust_score` cao hơn, ngày hiệu lực mới hơn và `source_id` rõ ràng hơn.
 
 Validator có thể trả về `pass`, `retry_search`, `retry_analysis` hoặc `hitl_required`. Nên giới hạn tối đa hai vòng retry để tránh lặp vô hạn.
 
@@ -284,6 +386,10 @@ Ví dụ output:
   "confidence": 0.71,
   "evidence_complete": true,
   "evidence_consistent": false,
+  "source_check_passed": true,
+  "relevance_check_passed": true,
+  "minimum_source_trust_score": 0.9,
+  "minimum_query_relevance_score": 0.82,
   "issues": [
     "Hai tài liệu có điều kiện kinh nghiệm khác nhau",
     "Chưa xác định tài liệu nào mới hơn"
