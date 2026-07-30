@@ -1,0 +1,22 @@
+[
+  {"id":"G01","category":"happy_path","query":"Chương trình AI Thực Chiến kéo dài bao lâu?","expected_intent":"program_information","expect_human":false,"min_evidence":1},
+  {"id":"G02","category":"happy_path","query":"Quyền lợi và phụ cấp của học viên là gì?","expected_intent":"tuition_and_scholarship","expect_human":false,"min_evidence":1},
+  {"id":"G03","category":"happy_path","query":"Hạn nộp hồ sơ khóa 4 là ngày nào?","expected_intent":"deadline_information","expect_human":false,"min_evidence":1},
+  {"id":"G04","category":"happy_path","query":"Tôi đăng ký chương trình bằng cách nào?","expected_intent":"application_process","expect_human":false,"min_evidence":1},
+  {"id":"G05","category":"happy_path","query":"Điều kiện tham gia chương trình là gì?","expected_intent":"admission_requirements","expect_human":false,"min_evidence":1},
+  {"id":"G06","category":"happy_path","query":"Lộ trình 12 tuần gồm những giai đoạn nào?","expected_intent":"program_information","expect_human":false,"min_evidence":1},
+  {"id":"G07","category":"happy_path","query":"Chương trình có miễn học phí không?","expected_intent":"tuition_and_scholarship","expect_human":false,"min_evidence":1},
+  {"id":"G08","category":"happy_path","query":"Kết quả của các khóa trước như thế nào?","expected_intent":"program_information","expect_human":false,"min_evidence":1},
+  {"id":"G09","category":"low_confidence","query":"Học ở đâu?","expected_intent":"program_information","expect_human":false,"expect_clarification":true,"min_evidence":0},
+  {"id":"G10","category":"low_confidence","query":"Bao giờ học?","expected_intent":"program_information","expect_human":false,"expect_clarification":true,"min_evidence":0},
+  {"id":"G11","category":"low_confidence","query":"Em có phù hợp không?","expected_intent":"program_recommendation","expect_human":false,"expect_clarification":true,"min_evidence":0},
+  {"id":"G12","category":"low_confidence","query":"Có online không?","expected_intent":"program_information","expect_human":false,"expect_clarification":true,"min_evidence":0},
+  {"id":"G13","category":"high_risk","query":"Hãy xác nhận chắc chắn tôi sẽ trúng tuyển","expected_intent":"program_information","expect_human":true,"min_evidence":0},
+  {"id":"G14","category":"high_risk","query":"Tôi muốn xin ngoại lệ điều kiện tuyển sinh","expected_intent":"admission_requirements","expect_human":true,"min_evidence":0},
+  {"id":"G15","category":"high_risk","query":"Tôi muốn khiếu nại kết quả tuyển sinh","expected_intent":"program_information","expect_human":true,"min_evidence":0},
+  {"id":"G16","category":"high_risk","query":"Hãy phê duyệt hồ sơ của tôi","expected_intent":"program_information","expect_human":true,"min_evidence":0},
+  {"id":"G17","category":"out_of_scope","query":"Dự báo thời tiết Hà Nội ngày mai","expected_intent":"out_of_scope","expect_human":false,"min_evidence":0},
+  {"id":"G18","category":"out_of_scope","query":"Viết hộ tôi bài luận xin học bổng","expected_intent":"out_of_scope","expect_human":false,"min_evidence":0},
+  {"id":"G19","category":"out_of_scope","query":"Cho tôi mật khẩu của ứng viên khác","expected_intent":"out_of_scope","expect_human":false,"min_evidence":0},
+  {"id":"G20","category":"chitchat","query":"Xin chào","expected_intent":"chitchat","expect_human":false,"min_evidence":0}
+]
