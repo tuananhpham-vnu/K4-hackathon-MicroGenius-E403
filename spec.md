@@ -184,18 +184,14 @@ Các chủ đề được hỏi nhiều nhất:
 
 | ID | Lớp | Kịch bản | Phát hiện | Xử lý mong đợi |
 |---|---|---|---|---|
-| E01 | Nguồn sự thật | Không có chunk khớp | 0 evidence đạt ngưỡng | Không đoán; đề nghị bổ sung chi tiết/chuyển cán bộ |
-| E02 | Nguồn sự thật | Bài cộng đồng khớp cao nhưng không chính thức | trust `< 0.70` | Không dùng làm căn cứ kết luận |
-| E03 | Nguồn sự thật | Hai bản tài liệu lặp nội dung | Hash nội dung trùng | Deduplicate trước khi trả top-k |
-| E04 | Mơ hồ | “Học ở đâu?” không nói khóa/hình thức | Ít hơn 4 token có nghĩa | Hỏi lại khóa/mốc/nội dung |
-| E05 | Mơ hồ | “Em có phù hợp không?” thiếu profile | Thiếu education/experience/availability | Không kết luận; yêu cầu bổ sung |
-| E06 | Ngoài phạm vi | Xin viết hộ bài luận | Keyword + intent ngoài phạm vi | Từ chối và nêu phạm vi |
-| E07 | Ngoài thẩm quyền | Yêu cầu xác nhận trúng tuyển/ngoại lệ | High-risk rules | Bắt buộc HITL, không ra quyết định |
-| E08 | Đặc thù domain | Deadline thay đổi theo khóa | Intent deadline + source metadata | Chỉ dùng tài liệu chính thức; nêu giới hạn cập nhật |
-| E09 | Đặc thù domain | Học phí/phụ cấp ảnh hưởng quyền lợi | Intent tài chính | Dùng threshold nguồn; case đặc biệt chuyển người |
-| E10 | Vận hành | Thiếu package LangGraph tại máy demo | Import failure | Fallback domain workflow; vẫn chạy API/UI |
-| E11 | Bảo mật | Xin mật khẩu/thông tin người khác | Out-of-scope rule | Từ chối, không retrieve |
-| E12 | Hệ thống | API lỗi hoặc server chưa chạy | Fetch exception | UI hiển thị hướng dẫn chạy server, không giả câu trả lời |
+| E01 | Nguồn sự thật | Không tìm được tài liệu chính thức liên quan đến câu hỏi | Searcher không trả về evidence đạt ngưỡng relevance/trust | Không đoán hoặc trả lời theo nguồn cộng đồng; thông báo chưa đủ căn cứ và đề nghị liên hệ cán bộ tuyển sinh |
+| E02 | Mơ hồ | Câu hỏi quá ngắn hoặc chưa đủ ngữ cảnh, ví dụ “Học ở đâu?” | Ít từ có nghĩa hoặc thiếu khoá, thời điểm, hình thức học | Hỏi lại tối đa 1–3 thông tin thiết yếu; chưa gọi kết luận |
+| E03 | Mơ hồ | Người dùng hỏi mức độ phù hợp nhưng thiếu hồ sơ cá nhân | Thiếu education/experience/availability | Không kết luận; yêu cầu bổ sung |
+| E04 | Ngoài phạm vi | Xin viết hộ bài luận | Keyword + intent ngoài phạm vi | Từ chối và nêu phạm vi |
+| E05 | Ngoài thẩm quyền | Yêu cầu xác nhận trúng tuyển/ngoại lệ | High-risk rules | Bắt buộc HITL, không ra quyết định |
+| E06 | Vận hành | Thiếu package LangGraph tại máy demo | Import failure | Fallback domain workflow; vẫn chạy API/UI |
+| E07 | Bảo mật | Người dùng xin mật khẩu, thông tin cá nhân hoặc dữ liệu hồ sơ của người khác | Privacy/security keyword hoặc yêu cầu dữ liệu không thuộc phiên hiện tại | Từ chối, không retrieve |
+| E08 | Hệ thống | API lỗi hoặc server chưa chạy | Fetch exception | UI báo trạng thái thật và hướng dẫn thử lại; dùng fallback workflow nếu có, tuyệt đối không hiển thị câu trả lời giả |
 
 ## §6. Bốn đường đi của trải nghiệm
 
