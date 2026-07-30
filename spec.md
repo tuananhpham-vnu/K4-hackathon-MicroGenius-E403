@@ -1,10 +1,8 @@
-# AI SPEC — Tư vấn tuyển sinh có căn cứ · Nhóm MicroGenius E403
 
-Hướng: **C — Làn mở**  
-Loại: **Tính năng mới**  
-Mức hiện tại: **Working prototype**
 
-> Chốt phạm vi: trợ lý chỉ tư vấn thông tin Chương trình AI Thực Chiến từ tài liệu cục bộ đã phê duyệt; không ra quyết định tuyển sinh và không sửa hồ sơ.
+# AI SPEC — [Tên lát cắt] · Nhóm [XX] · Zone [X]
+Hướng: C — Làn mở
+Loại: Tính năng mới
 
 ### §1. User & Job
 
@@ -180,112 +178,22 @@ Các chủ đề được hỏi nhiều nhất:
   | PAIR — Mental Models | Không dùng nhãn `accepted`/`rejected`; chỉ dùng nhãn phù hợp có điều kiện. |
   | PAIR — Errors & Graceful Failure | Tách lỗi thiếu source, source mâu thuẫn, query mơ hồ và vượt thẩm quyền thành các route khác nhau. |
 
-## §5. Kiểu lỗi — 4 lớp chỗ khó
-
-| ID | Lớp | Kịch bản | Phát hiện | Xử lý mong đợi |
-|---|---|---|---|---|
-| E01 | Nguồn sự thật | Không có chunk khớp | 0 evidence đạt ngưỡng | Không đoán; đề nghị bổ sung chi tiết/chuyển cán bộ |
-| E02 | Nguồn sự thật | Bài cộng đồng khớp cao nhưng không chính thức | trust `< 0.70` | Không dùng làm căn cứ kết luận |
-| E03 | Nguồn sự thật | Hai bản tài liệu lặp nội dung | Hash nội dung trùng | Deduplicate trước khi trả top-k |
-| E04 | Mơ hồ | “Học ở đâu?” không nói khóa/hình thức | Ít hơn 4 token có nghĩa | Hỏi lại khóa/mốc/nội dung |
-| E05 | Mơ hồ | “Em có phù hợp không?” thiếu profile | Thiếu education/experience/availability | Không kết luận; yêu cầu bổ sung |
-| E06 | Ngoài phạm vi | Xin viết hộ bài luận | Keyword + intent ngoài phạm vi | Từ chối và nêu phạm vi |
-| E07 | Ngoài thẩm quyền | Yêu cầu xác nhận trúng tuyển/ngoại lệ | High-risk rules | Bắt buộc HITL, không ra quyết định |
-| E08 | Đặc thù domain | Deadline thay đổi theo khóa | Intent deadline + source metadata | Chỉ dùng tài liệu chính thức; nêu giới hạn cập nhật |
-| E09 | Đặc thù domain | Học phí/phụ cấp ảnh hưởng quyền lợi | Intent tài chính | Dùng threshold nguồn; case đặc biệt chuyển người |
-| E10 | Vận hành | Thiếu package LangGraph tại máy demo | Import failure | Fallback domain workflow; vẫn chạy API/UI |
-| E11 | Bảo mật | Xin mật khẩu/thông tin người khác | Out-of-scope rule | Từ chối, không retrieve |
-| E12 | Hệ thống | API lỗi hoặc server chưa chạy | Fetch exception | UI hiển thị hướng dẫn chạy server, không giả câu trả lời |
+## §5. Kiểu lỗi — 4 lớp chỗ khó + kịch bản (≥8) [bảng theo guide §2.5]
 
 ## §6. Bốn đường đi của trải nghiệm
-
-- **Happy path:** câu rõ → retrieve nguồn chính thức → validation pass → câu trả lời + source cards.
-- **Low-confidence:** câu quá ngắn hoặc thiếu profile → hỏi lại khóa/mốc/nội dung; không biến phỏng đoán thành kết luận.
-- **Failure/không căn cứ:** không có evidence đạt trust/relevance → trả “chưa tìm thấy bằng chứng đủ tin cậy” và đề nghị cán bộ xác nhận.
-- **Correction:** người dùng nhập câu mới trong composer; session giữ câu hỏi mới, chạy lại toàn bộ retrieval/validation và thay evidence panel.
-- **Ngoài phạm vi:** từ chối yêu cầu như thời tiết, mật khẩu, làm hộ.
-- **Đặc thù domain:** ngoại lệ, khiếu nại, phê duyệt, trúng tuyển và tình trạng hồ sơ luôn có cảnh báo cần cán bộ.
+- Happy path: · Low-confidence (②): · Failure/không căn cứ (①): · Correction (user sửa):
+- Khi bị đòi ngoài phạm vi (③): · Case đặc thù domain (④):
 
 ## §7. Kiểm thử
-
-### Chiều chất lượng
-
-| Chiều | Định nghĩa kiểm chứng được |
-|---|---|
-| Routing | Intent thực tế bằng `expected_intent` |
-| HITL | `needs_human` bằng nhãn kỳ vọng |
-| Clarification | Case mơ hồ bật `need_clarification` |
-| Grounding | Số evidence đạt trust/relevance không thấp hơn `min_evidence` |
-| Traceability | Evidence có `source_id`, locator, relevance; source có URI và trust |
-| Safety | High-risk không thiếu cảnh báo cán bộ; out-of-scope không retrieve |
-| Integration | `/`, `/api/health`, `/api/query` trả HTTP 200 và UI gọi API thật |
-
-### Golden set
-
-- File: `eval/golden_set.json`.
-- 20 case: 8 happy path, 4 low-confidence, 4 high-risk, 3 out-of-scope, 1 chitchat.
-- Runner tái lập: `python eval/run_golden_set.py`.
-- Kết quả chi tiết: `eval/results.json`.
-
-### Quality bar
-
-**Đạt khi ≥80% case qua toàn bộ check, 100% case high-risk được route đúng, và không evidence cộng đồng trust 0.62 được dùng làm căn cứ.**
-
-### Kết quả hiện tại
-
-| Lượt | Thay đổi | Passed | Tỷ lệ | Quality bar |
-|---|---|---:|---:|---|
-| Baseline đầu tiên | Sau khi nối corpus/UI | 13/20 | 65% | Không đạt |
-| Lượt 2 | Sửa chitchat, clarification, out-of-scope | 20/20 | 100% | Đạt |
-
-Ngoài golden set:
-
-- 4/4 unit test harness/observability đạt.
-- 6/6 traceability/eval test đạt.
-- `node --check codebase/app.js` đạt.
-- HTTP smoke test: health, trang `/` và query đều 200; query có evidence và validation pass.
-
-Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuyến/evidence tối thiểu, chưa có human grading cho semantic correctness từng câu và chưa đo latency/cost với LLM thật. Con số 100% không được diễn giải là 100% chính xác ngoài tập test.
+- Chiều chất lượng + định nghĩa kiểm chứng được:
+- Golden set (≥20 case theo cơ cấu trong guide §2.6, file trong eval/):
+- Quality bar (chốt từ 23:59, giữ nguyên sau đó): "Đạt khi ≥ ___% qua bộ, và ___"
+- Kết quả các lượt chạy (bảng % — cập nhật đến trước CP6):
 
 ## §8. Phân công & kế hoạch
-
-
-| Thành viên | Mã học viên | Phần phụ trách |
-|---|---|---|
-| Nguyễn Đức Anh | 2A202601788 | Thu thập và xử lý dữ liệu cộng đồng |
-| Phạm Tuấn Anh | 2A202601070 | Backend, agent workflow, harness |
-| Nguyễn Thị Thương | 2A202601226 | Thu thập và chuẩn hóa tài liệu tuyển sinh |
-| Mai Tiến Dũng | 2A202601838 | Frontend, dữ liệu cộng đồng, tích hợp demo, eval, validation |
-
-### Validation CP5
-
-Kế hoạch 15 phút/người với ít nhất 3 ứng viên thật ngoài nhóm:
-
-1. “Bạn đang muốn ra quyết định gì sau khi hỏi câu này?”
-2. “Nguồn và cảnh báo hiện tại có đủ để bạn tin/biết bước tiếp theo không?”
-3. “Có đoạn nào khiến bạn hiểu rằng hệ thống đã quyết định thay cán bộ không?”
-
-Log cần ghi: tên/người thử, câu hỏi gốc, task success, điểm tin tưởng 1–5, chỗ hiểu sai, đề xuất và thay đổi sau feedback. **Tên 3 willing users và feedback log chưa tồn tại trong repo; đây là đầu vào từ người thật, không được tạo giả bằng code.**
-
-### Multi-prototype
-
-Hai phương án đã cân nhắc:
-
-- A — câu trả lời tĩnh đẹp, nhanh demo nhưng không có bằng chứng runtime;
-- B — UI gọi workflow có source/validation/audit, giao diện có thể ít “mượt” hơn nhưng kiểm chứng được.
-
-Chọn B vì rubric ưu tiên chuỗi quyết định và bằng chứng.
+- Phân công có tên: spec / evidence / prompt / code / demo
+- Willing users (≥3 tên) + kế hoạch vòng validation CP5 (3 câu hỏi, ai log):
+- Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn:
 
 ## §9. Changelog
-
-| Thời điểm | Đổi gì | Vì sao |
-|---|---|---|
-| 2026-07-30 | Chuyển knowledge base từ đường dẫn không tồn tại sang discovery ở repo | Backend trước đó health = 0 nguồn/0 tài liệu |
-| 2026-07-30 | Nạp Markdown chính thức và JSON cộng đồng với trust khác nhau | Tách pain evidence khỏi nguồn dùng để kết luận |
-| 2026-07-30 | Nối `codebase/` với `/api/query`, evidence panel và trạng thái lỗi | UI trước đó trả lời hard-coded |
-| 2026-07-30 | Server phục vụ trực tiếp static UI/assets | Trước đó server dùng một UI khác trong `mas/ui.py` |
-| 2026-07-30 | Deduplicate chunk và query expansion theo intent | Query thời lượng từng xếp nguồn không liên quan cao hơn lộ trình |
-| 2026-07-30 | Thêm 20-case golden set và runner | Repo trước đó chỉ có test contract, chưa có quality bar tái lập |
-| 2026-07-30 | Sửa chitchat, low-confidence và out-of-scope | Baseline 13/20; các nhánh này định tuyến sai |
-| 2026-07-30 | Thêm fallback khi máy chưa cài LangGraph | Đảm bảo demo tối thiểu vẫn chạy; cài đủ requirements sẽ dùng graph |
-
+| Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |
