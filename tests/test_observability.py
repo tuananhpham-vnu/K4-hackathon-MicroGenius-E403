@@ -6,7 +6,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mas.observability import TraceLogger
+from admissions_mas.services.observability import TraceLogger
 
 
 class ObservabilityTests(unittest.TestCase):

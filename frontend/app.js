@@ -1,3 +1,7 @@
+// Set window.__API_BASE__ before loading this file when the frontend is hosted elsewhere.
+const configuredApiBase = new URLSearchParams(window.location.search).get("api_base");
+const API_BASE = window.__API_BASE__ || configuredApiBase || (window.location.port === "8765" ? "" : "http://127.0.0.1:8765");
+
 const navItems = [
   { id: "chat", label: "Trò chuyện", icon: "message" },
   { id: "faq", label: "FAQ", icon: "help" },
@@ -277,7 +281,7 @@ async function runChat(question) {
   sourceList.innerHTML = '<p class="subtle">Đang kiểm tra nguồn và độ liên quan…</p>';
 
   try {
-    const response = await fetch("/api/query", {
+    const response = await fetch(`${API_BASE}/api/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -291,11 +295,14 @@ async function runChat(question) {
 
     const validation = data.validation || {};
     const status = validation.passed
-      ? `Đã kiểm chứng ${validation.evidence_count || 0} bằng chứng`
+      ? `Đã kiểm chứng ${validation.evidence_count || 0} bằng chứng · relevance ${Number(validation.avg_relevance || 0).toFixed(2)} · trust ${Number(validation.avg_source_trust || 0).toFixed(2)}`
       : "Chưa đủ bằng chứng — cần tư vấn viên";
+    const logs = await (await fetch(`${API_BASE}/api/logs`)).json();
+    const requestLogs = logs.filter((item) => item.request_id === data.request_id);
     answer.innerHTML = `
       <p>${escapeHtml(data.response)}</p>
       <p class="subtle">${escapeHtml(status)}</p>
+      <p class="subtle">Trace: ${escapeHtml(data.request_id)} · ${requestLogs.length} bước đã log · ${requestLogs.some((item) => item.step === "tool_call" && item.payload?.tool === "web.search") ? "đã gọi web search" : "local search"}</p>
       <button class="source-toggle" type="button" data-show-sources>
         Xem nguồn (${(data.sources || []).length})
       </button>
@@ -308,7 +315,7 @@ async function runChat(question) {
             <span class="page-icon">S</span>
             <span>
               <strong>${escapeHtml(source.title)}</strong>
-              <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)}</span>
+              <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)} · <a href="${escapeHtml(source.uri)}" target="_blank" rel="noreferrer">mở nguồn</a></span>
             </span>
           </div>
         `).join("")
@@ -316,10 +323,14 @@ async function runChat(question) {
     bindSourceButton();
   } catch (error) {
     answer.innerHTML = `
-      <p>Không thể kết nối tới agent. Hãy chạy ứng dụng bằng <strong>python src/server.py</strong> rồi thử lại.</p>
-      <p class="subtle">${escapeHtml(error.message)}</p>
+      <p>Agent chưa thể hoàn tất yêu cầu này.</p>
+      <p class="subtle">API: ${escapeHtml(`${API_BASE || window.location.origin}/api/query`)}</p>
+      <p class="subtle">Chi tiết kỹ thuật: ${escapeHtml(error.message || "Unknown error")}</p>
+      <button class="source-toggle" type="button" data-retry-query>Thử lại</button>
     `;
     sourceList.innerHTML = '<p class="subtle">Chưa tải được nguồn.</p>';
+    const retryButton = shell.querySelector("[data-retry-query]");
+    retryButton?.addEventListener("click", () => runChat(question), { once: true });
   }
 }
 

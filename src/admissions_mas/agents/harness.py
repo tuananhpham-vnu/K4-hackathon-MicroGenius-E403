@@ -72,7 +72,7 @@ class AgentHarness:
     DEFAULT_PLANS = {
         "orchestrator": HarnessPlan("orchestrator", "llm", (), ("session",), ("input", "risk")),
         "analyst": HarnessPlan("analyst", "llm", (), ("session", "candidate_profile"), ("input", "no_invention")),
-        "searcher": HarnessPlan("searcher", "llm", ("knowledge_base.search", "source_registry.lookup"), ("session",), ("source_trace", "approved_sources")),
+        "searcher": HarnessPlan("searcher", "llm", ("knowledge_base.search", "web.search", "source_registry.lookup"), ("session",), ("source_trace", "approved_sources")),
         "validator": HarnessPlan("validator", "llm", ("source_registry.lookup",), ("session",), ("source_trace", "relevance_threshold")),
         "hitl_gate": HarnessPlan("hitl_gate", "rule_and_human", (), ("session", "audit"), ("high_risk", "human_required")),
         "synthesis": HarnessPlan("synthesis", "llm", ("source_registry.lookup",), ("session", "candidate_profile"), ("citation", "no_decision", "output")),

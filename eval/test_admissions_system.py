@@ -5,7 +5,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from admissions_system import XmlPrompt, create_workflow
-from mas.prompt_templates import prompt_messages
+from admissions_mas.prompts.template_registry import prompt_messages
 
 
 class TraceabilityTests(unittest.TestCase):

@@ -7,8 +7,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from mas.observability import TraceLogger
-from mas.workflow import create_workflow
+from admissions_mas.services.observability import TraceLogger
+from admissions_mas.services.workflow import create_workflow
 
 
 def main() -> int:

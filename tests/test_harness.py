@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from mas.harness import AgentHarness, GuardrailEngine, MemoryStore, ToolSpec
+from admissions_mas.agents.harness import AgentHarness, GuardrailEngine, MemoryStore, ToolSpec
 
 
 class HarnessTests(unittest.TestCase):

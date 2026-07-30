@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .utils import now_iso
+from ..infrastructure.text import now_iso
 
 
 @dataclass

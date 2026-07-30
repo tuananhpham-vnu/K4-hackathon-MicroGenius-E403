@@ -44,7 +44,8 @@ repo/
 ├── README.md          ← thành viên (mã HV + tên) + phân công có tên từng phần
 ├── spec.md            ← AI Spec theo 03-template-ai-spec.md
 ├── demo-slides.pdf    ← slide 6 trang theo 02-guide.md §5.1
-├── codebase/          ← prototype (ghi rõ phần nào mock)
+├── src/               ← backend, MAS agents, retrieval và services
+├── frontend/          ← giao diện web prototype
 ├── eval/              ← golden set + bảng kết quả các lượt chạy
 ├── validation/        ← feedback log từ vòng user test
 └── reflection/        ← mỗi người 1 file
@@ -64,7 +65,7 @@ Tổng **100 điểm = 25 điểm nộp checkpoint + 75 điểm chấm bài nộ
 | R2 · Lát cắt & thiết kế | 15 | `spec.md` §4 |
 | R3 · Chỗ khó & kịch bản rủi ro | 11 | `spec.md` §5-§6 |
 | R4 · Kiểm thử | 15 | `spec.md` §7 + `eval/` |
-| R5 · Prototype chạy được | 8 | `codebase/` + demo |
+| R5 · Prototype chạy được | 8 | `src/` + `frontend/` + demo |
 | R6 · Validation với user | 8 | `validation/` |
 | R7 · Quy trình & repo | 3 | cấu trúc repo |
 

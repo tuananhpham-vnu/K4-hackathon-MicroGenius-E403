@@ -238,7 +238,7 @@ Ngoài golden set:
 
 - 4/4 unit test harness/observability đạt.
 - 6/6 traceability/eval test đạt.
-- `node --check codebase/app.js` đạt.
+- `node --check frontend/app.js` đạt.
 - HTTP smoke test: health, trang `/` và query đều 200; query có evidence và validation pass.
 
 Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuyến/evidence tối thiểu, chưa có human grading cho semantic correctness từng câu và chưa đo latency/cost với LLM thật. Con số 100% không được diễn giải là 100% chính xác ngoài tập test.
@@ -278,7 +278,7 @@ Chọn B vì rubric ưu tiên chuỗi quyết định và bằng chứng.
 |---|---|---|
 | 2026-07-30 | Chuyển knowledge base từ đường dẫn không tồn tại sang discovery ở repo | Backend trước đó health = 0 nguồn/0 tài liệu |
 | 2026-07-30 | Nạp Markdown chính thức và JSON cộng đồng với trust khác nhau | Tách pain evidence khỏi nguồn dùng để kết luận |
-| 2026-07-30 | Nối `codebase/` với `/api/query`, evidence panel và trạng thái lỗi | UI trước đó trả lời hard-coded |
+| 2026-07-30 | Nối `frontend/` với `/api/query`, evidence panel và trạng thái lỗi | UI trước đó trả lời hard-coded |
 | 2026-07-30 | Server phục vụ trực tiếp static UI/assets | Trước đó server dùng một UI khác trong `mas/ui.py` |
 | 2026-07-30 | Deduplicate chunk và query expansion theo intent | Query thời lượng từng xếp nguồn không liên quan cao hơn lộ trình |
 | 2026-07-30 | Thêm 20-case golden set và runner | Repo trước đó chỉ có test contract, chưa có quality bar tái lập |

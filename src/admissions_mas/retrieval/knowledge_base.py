@@ -4,8 +4,9 @@ import json
 import re
 from pathlib import Path
 
-from .models import Evidence, Source
-from .utils import stable_id, tokens
+from ..domain.models import Evidence, Source
+from ..infrastructure.text import stable_id, tokens
+from .semantic_retriever import SemanticRetriever
 
 
 class KnowledgeBase:
@@ -16,6 +17,7 @@ class KnowledgeBase:
         self.sources: dict[str, Source] = {}
         self.documents: list[dict[str, str]] = []
         self._load()
+        self.semantic = SemanticRetriever(self)
 
     def _register(self, title: str, path: Path, source_type: str, trust: float) -> Source:
         source = Source(stable_id("src", str(path.resolve())), title, str(path), source_type, trust)
@@ -47,7 +49,7 @@ class KnowledgeBase:
             self._index_community_json(path)
 
     def _index_markdown(self, path: Path, source: Source) -> None:
-        chunks = re.split(r"\n\s*\n", path.read_text(encoding="utf-8"))
+        chunks = re.split(r"\n\s*\n|(?<=[.!?])\s+(?=[A-ZÀ-ỴĐ])", path.read_text(encoding="utf-8"))
         for index, chunk in enumerate(chunks, 1):
             clean = re.sub(r"\s+", " ", chunk).strip()
             if len(clean) <= 40:
@@ -79,6 +81,14 @@ class KnowledgeBase:
                 })
 
     def search(self, query: str, limit: int = 8) -> list[Evidence]:
+        if self.semantic.configured:
+            try:
+                semantic_results = self.semantic.search(query, limit=limit)
+                if semantic_results:
+                    return semantic_results
+            except Exception:
+                # Cloud/model failures must not take down the local fallback.
+                pass
         query_tokens = tokens(query)
         ranked: list[tuple[float, dict[str, str]]] = []
         for document in self.documents:
@@ -107,3 +117,7 @@ class KnowledgeBase:
             if len(results) >= limit:
                 break
         return results
+
+    def index_semantic_documents(self) -> int:
+        """Embed and upsert the current regex-chunked corpus into Weaviate."""
+        return self.semantic.index(self.documents)

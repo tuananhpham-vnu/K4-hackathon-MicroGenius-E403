@@ -6,32 +6,42 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
-from mas.workflow import create_workflow
+from dotenv import load_dotenv
+load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+
+from admissions_mas.services.workflow import create_workflow
 
 try:
-    from langgraph_mas import LangGraphAdmissionsMAS
+    from admissions_mas.agents.graph import LangGraphAdmissionsMAS
 except ModuleNotFoundError:
     LangGraphAdmissionsMAS = None
 
-
 WORKFLOW = create_workflow(Path(__file__).resolve().parents[1])
 MAS = LangGraphAdmissionsMAS(WORKFLOW) if LangGraphAdmissionsMAS else None
-WEB_ROOT = Path(__file__).resolve().parents[1] / "codebase"
+WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend"
 
 
 class Handler(BaseHTTPRequestHandler):
     def _send(self, body: str, status: int = 200, content_type: str = "text/html; charset=utf-8") -> None:
         encoded = body.encode("utf-8")
+        if content_type == "application/json":
+            content_type = "application/json; charset=utf-8"
         self.send_response(status)
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.end_headers()
         self.wfile.write(encoded)
+
+    def do_OPTIONS(self) -> None:
+        self._send("", 204, "text/plain; charset=utf-8")
 
     def do_GET(self) -> None:
         request_path = urlparse(self.path).path
         if request_path == "/api/health":
-            self._send(json.dumps({"status": "ok", "sources": len(WORKFLOW.kb.sources), "documents": len(WORKFLOW.kb.documents)}), content_type="application/json")
+            self._send(json.dumps({"status": "ok", "sources": len(WORKFLOW.kb.sources), "documents": len(WORKFLOW.kb.documents), "langgraph_available": bool(MAS), "web_search_available": bool(MAS and MAS.web_search.available)}), content_type="application/json")
         elif request_path == "/api/audit":
             self._send(json.dumps(WORKFLOW.audit_log, ensure_ascii=False), content_type="application/json")
         elif request_path == "/api/logs":
@@ -59,6 +69,7 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/api/query":
             self._send("Not found", 404, "text/plain; charset=utf-8")
             return
+        request_id = "unknown"
         try:
             length = int(self.headers.get("Content-Length", "0"))
             payload = json.loads(self.rfile.read(length).decode("utf-8"))
@@ -74,6 +85,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send(json.dumps(result, ensure_ascii=False), content_type="application/json")
         except (ValueError, json.JSONDecodeError) as error:
             self._send(json.dumps({"error": str(error)}), 400, "application/json")
+        except Exception as error:
+            WORKFLOW.logger.event(request_id=request_id, step="request_error", component="server", payload={"error_type": type(error).__name__, "error": str(error)})
+            self._send(json.dumps({"error": "Agent request failed", "request_id": request_id, "detail": str(error)}, ensure_ascii=False), 500, "application/json")
 
 
 if __name__ == "__main__":

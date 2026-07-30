@@ -1,7 +1,7 @@
 from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
-from .models import Evidence
+from ..domain.models import Evidence
 
 
 class XmlPrompt:

@@ -3,12 +3,12 @@
 import json
 import sys
 
-from mas.models import Evidence, Source
-from mas.prompts import XmlPrompt
-from mas.retrieval import KnowledgeBase
-from mas.ui import html_page
-from mas.utils import now_iso, stable_id, tokens
-from mas.workflow import AdmissionsWorkflow, create_workflow
+from admissions_mas.domain.models import Evidence, Source
+from admissions_mas.infrastructure.text import now_iso, stable_id, tokens
+from admissions_mas.presentation.ui import html_page
+from admissions_mas.prompts.xml_prompt import XmlPrompt
+from admissions_mas.retrieval.knowledge_base import KnowledgeBase
+from admissions_mas.services.workflow import AdmissionsWorkflow, create_workflow
 
 __all__ = ["AdmissionsWorkflow", "Evidence", "KnowledgeBase", "Source", "XmlPrompt", "create_workflow", "html_page"]
 

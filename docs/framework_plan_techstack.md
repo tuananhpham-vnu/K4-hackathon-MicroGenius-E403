@@ -147,7 +147,7 @@ Prototype ghi log tại `logs/mas.jsonl`, in tóm tắt từng bước ra consol
 | Orchestrator | `query`, `history`, `context`, profile | Phân loại intent, chấm clarity/risk, nhận diện chitchat, chọn bước tiếp theo | Không dùng tool ở MVP | `session` | Input validation, risk detection | `orchestration`, route Analyst/Synthesis/HITL |
 | Summarizer | History dài, confirmed facts | Nén hội thoại, giữ facts đã xác nhận, câu hỏi chưa giải quyết | Memory read | `session`, `candidate_profile` | Không tạo fact mới, giữ uncertainty | Summary state cho Analyst |
 | Admissions Analyst | Query, history, profile | Trích xuất entity, phát hiện missing fields, rewrite query, tạo sub-task | Không dùng tool ở MVP | `session`, `candidate_profile` | Không suy diễn thông tin hồ sơ | `analysis`, route Searcher hoặc hỏi lại |
-| Searcher | Rewritten query, sub-task | Chia sub-query, tìm chunk, lưu source metadata, chấm relevance sơ bộ | `knowledge_base.search`, `source_registry.lookup` | `session` | Chỉ approved source, bắt buộc source trace | Evidence list hoặc retry/HITL |
+| Searcher | Rewritten query, sub-task | Chia sub-query, tìm chunk local hoặc web, lưu source metadata, chấm relevance sơ bộ | `knowledge_base.search`, `web.search`, `source_registry.lookup` | `session` | Chỉ approved source, bắt buộc source trace | Evidence list hoặc retry/HITL |
 | Program Matcher | Profile, validated evidence | So khớp requirement, phân loại `suitable`/`potentially_suitable`/`insufficient_information`/`unlikely_suitable` | `source_registry.lookup` | `candidate_profile`, `session` | Không trả `accepted`/`rejected` | Fit assessment có evidence IDs |
 | Validator | Evidence, original query, matching result | Kiểm completeness, trust, relevance, consistency, freshness và unsupported claims | `source_registry.lookup` | `session`, `audit` | `source_trust_score`, `relevance_score`, citation | `pass`, retry hoặc HITL |
 | HITL Gate | Validation, risk, policy flags | Kết hợp rule-based và human review requirement | Không dùng LLM tool tự quyết | `session`, `audit` | High-risk bắt buộc human | `pending_human_review`, approve/edit/request retrieval |
@@ -519,6 +519,7 @@ Audit log cần lưu câu hỏi gốc, truy vấn đã viết lại, nguồn đ�
 | Knowledge Base Search | Quy chế, chính sách, FAQ, hướng dẫn tuyển sinh. |
 | Program Database Tool | Tên chương trình, nội dung, yêu cầu, thời lượng, hình thức học. |
 | Official Website Search | Thông báo mới nhất trên website chính thức. |
+| Web Search Tool | Firecrawl `/search` discovery-first cho thông tin web cập nhật. Kết quả là candidate evidence; chỉ domain trong allowlist mới được Validator coi là approved external source. |
 | Deadline Tool | Ngày mở đơn, đóng đơn, phỏng vấn, công bố kết quả. |
 | CRM Read Tool | Trạng thái hồ sơ của ứng viên. |
 | Candidate Profile Tool | Thông tin ứng viên đã cung cấp trong hội thoại. |
@@ -580,11 +581,12 @@ Trong MVP, CRM nên ở chế độ `read-only`. Mọi hành động sửa, xóa
 | Backend API | FastAPI hoặc NestJS | Điều phối request, session, agent workflow, auth. | FastAPI hợp với Python/RAG; NestJS hợp nếu team mạnh TypeScript. |
 | Agent orchestration | LangGraph hoặc OpenAI Agents SDK | Xây graph multi-agent, retry loop, HITL state. | LangGraph mạnh về workflow có trạng thái; Agents SDK gọn nếu dùng sâu hệ OpenAI. |
 | LLM | OpenAI GPT-4.1/GPT-4o hoặc model tương đương | Orchestrator, Analyst, Validator, Synthesis. | Nên cấu hình theo vai trò để tối ưu chi phí. |
-| Embedding | OpenAI text-embedding-3-large/small hoặc BGE-M3 | Vector hóa tài liệu tuyển sinh. | `small` tiết kiệm; `large` tốt hơn khi tài liệu nhiều/nhiễu. |
-| Vector database | Qdrant, Weaviate hoặc pgvector | Lưu và truy xuất chunk tài liệu. | pgvector đơn giản nếu đã dùng PostgreSQL. |
+| Embedding | `bkai-foundation-models/vietnamese-bi-encoder` qua Sentence Transformers | Vector hóa tiếng Việt cho document/query. | Dùng cùng model khi index và search; encode normalize để near-vector ổn định. |
+| Vector database | Weaviate Cloud | Lưu vector tự cung cấp, metadata source/locator/text và semantic search. | Credentials qua `.env`; collection dùng self-provided vectors. |
 | Relational database | PostgreSQL | Session, profile, audit log, ticket, metadata. | Nên là nguồn chính cho dữ liệu có cấu trúc. |
 | Cache/queue | Redis, Celery/RQ | Cache retrieval, xử lý job nền, notification. | Có thể bỏ qua ở demo nhỏ. |
-| Document processing | Unstructured, PyMuPDF, docling | Parse PDF/DOCX/HTML, chuẩn hóa tài liệu. | Quan trọng để RAG sạch. |
+| Document processing | Regex chunking, PyMuPDF/Unstructured khi cần | Parse và chia tài liệu thành chunk có locator. | MVP đọc `Tailieutubtc/`; regex giữ paragraph/sentence boundaries. |
+| Web discovery | Firecrawl Search API / `firecrawl-py` | Tìm nguồn web mới trước khi scrape/extract. | Cần `FIRECRAWL_API_KEY`; không tự tin cậy web result ngoài allowlist. |
 | Evaluation | Ragas, DeepEval, custom test set | Đánh giá accuracy, faithfulness, citation, HITL recall. | Nên có bộ câu hỏi thật/giả lập từ tuyển sinh. |
 | Observability | LangSmith, OpenTelemetry, Grafana | Theo dõi trace agent, chi phí, latency, lỗi. | Rất hữu ích khi debug multi-agent. |
 | Auth | NextAuth/Auth.js hoặc OAuth nội bộ | Phân quyền ứng viên, cán bộ tuyển sinh, admin. | MVP có thể dùng mock auth. |
