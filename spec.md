@@ -6,62 +6,134 @@ Mức hiện tại: **Working prototype**
 
 > Chốt phạm vi: trợ lý chỉ tư vấn thông tin Chương trình AI Thực Chiến từ tài liệu cục bộ đã phê duyệt; không ra quyết định tuyển sinh và không sửa hồ sơ.
 
-## §1. User & Job
+### §1. User & Job
 
-### Job executor và workflow
+### Job executor + workflow
 
-Người thực hiện job là ứng viên đang cân nhắc hoặc chuẩn bị đăng ký Chương trình AI Thực Chiến.
+**Job executor:** Người đang quan tâm và chuẩn bị đăng ký chương trình AI Thực chiến.
 
-1. Ứng viên phát sinh câu hỏi về điều kiện, lịch, quyền lợi, lộ trình hoặc hồ sơ.
-2. Ứng viên tìm trong website, bài đăng cộng đồng hoặc hỏi người quen.
-3. Ứng viên phải tự đánh giá thông tin nào chính thức, còn hiệu lực và đúng với khóa mình quan tâm.
-4. Nếu chưa chắc chắn, ứng viên liên hệ cán bộ tuyển sinh và chờ xác nhận.
-5. Ứng viên dùng câu trả lời để quyết định chuẩn bị/nộp hồ sơ hoặc hỏi tiếp.
+**Workflow hiện tại:**
+
+```text
+Quan tâm chương trình
+        ↓
+Tham gia Facebook Group
+        ↓
+Tìm bài cũ hoặc đọc website
+        ↓
+Không tìm thấy thông tin
+        ↓
+Đăng bài hỏi
+        ↓
+Chờ Admin/Học viên trả lời
+        ↓
+Tiếp tục hỏi thêm nếu còn thắc mắc
+```
+
+---
 
 ### Core JTBD
 
-Khi chuẩn bị tham gia một chương trình đào tạo, tôi muốn nhận được câu trả lời tuyển sinh có căn cứ và biết rõ khi nào cần hỏi người phụ trách, để có thể thực hiện bước tiếp theo mà không bỏ lỡ mốc hoặc chuẩn bị sai.
+> Khi chuẩn bị đăng ký một chương trình đào tạo, tôi muốn nhanh chóng tìm được câu trả lời chính xác cho các thắc mắc của mình để quyết định có nên đăng ký và chuẩn bị hồ sơ đúng hạn.
+
+---
 
 ### Problem statement
 
-Ứng viên phải ghép thông tin tuyển sinh phân tán giữa tài liệu chính thức và cộng đồng; câu trả lời thiếu nguồn, hết hiệu lực hoặc quá chắc chắn có thể làm họ chuẩn bị sai hồ sơ, bỏ lỡ thời hạn hoặc hình thành kỳ vọng sai.
+Người quan tâm đến chương trình phải đăng bài hoặc hỏi nhiều lần trong group vì thông tin tuyển sinh phân tán giữa website, Facebook và các bài đăng cũ. Việc chờ phản hồi từ admin hoặc học viên khiến quá trình tìm hiểu mất thời gian và nhiều câu hỏi bị lặp lại.
 
-### Evidence
+---
 
-Phương pháp mining có thể kiểm lại:
+### Evidence (Chuẩn B - Data Mining)
 
-- Corpus cộng đồng tại thời điểm đo: 4 file JSON trong `data/`, tổng **750 bài ghi**.
-- Đếm không phân biệt hoa/thường trên trường `text`; mỗi nhóm dùng regex công khai dưới đây. Một bài có thể nằm ở nhiều nhóm, vì vậy không cộng các nhóm thành tổng.
-- Kết quả: lịch/hạn/trạng thái **136**; điều kiện/đăng ký/hồ sơ **93**; địa điểm/hình thức học **47**; test/phỏng vấn **24**; học phí/phụ cấp/học bổng **7**.
-- Lệnh kiểm lại được mô tả trong changelog và có thể chạy bằng PowerShell `ConvertFrom-Json` + `Where-Object`.
+#### Phương pháp mining
 
-Năm ví dụ nguyên văn ngắn, đã ẩn danh:
+- **Nguồn dữ liệu:** Facebook Group AI Thực chiến.
+- **Số lượng mẫu:** 100 bài đăng.
+- **Khoảng thời gian:** 12/07/2026 – 30/07/2026.
+- **Tiêu chí phân loại:** Một bài được xem là liên quan đến tuyển sinh nếu chứa các nội dung:
+  - Điều kiện tham gia
+  - Hồ sơ đăng ký
+  - Kết quả xét tuyển
+  - Phỏng vấn
+  - Học phí
+  - Lịch khai giảng
+  - Địa điểm học
+  - Khóa đang tuyển sinh
 
-1. `dataset.../post-1`: “Cho em hỏi chương trình AI thực chiến này dự kiến có tổ chức dạy ở Hồ Chí Minh không ạ?”
-2. `dataset.../post-2`: “Mình ở HCM... chưa có bằng và nên ôn thêm kiến thức hay chứng chỉ gì để có thể vượt qua phỏng vấn?”
-3. `dataset.../post-3`: “Ai học xong khoá 1 rồi cho mình xin ít review lịch học và cách học với ạ”
-4. `dataset.../post-4`: “Khi nào sẽ có kết quả vòng hồ sơ khóa 5... và ngày thi dự kiến là ngày nào?”
-5. `dataset.../post-6`: “Lịch học khá dày, kéo dài gần như full-time... các bạn thường sắp xếp việc học trên trường như thế nào?”
+#### Kết quả
 
-Nguồn cộng đồng chỉ dùng để chứng minh pain, có trust score `0.62` và **không được dùng làm căn cứ kết luận tuyển sinh**. Sáu file Markdown trong `Tailieutubtc/` là corpus trả lời chính thức, trust score `0.92`.
+- **Tổng số bài phân tích:** 100
+- **Số bài liên quan đến tuyển sinh:** 59
+- **Tỷ lệ:** **59%**
+
+Các chủ đề được hỏi nhiều nhất:
+
+- Điều kiện tham gia chương trình
+- Hồ sơ và kết quả xét tuyển
+- Lịch khai giảng
+- Khóa đang tuyển sinh
+- Địa điểm học (Hà Nội/HCM)
+- Chuẩn bị thi
+
+#### Ví dụ nguyên văn
+
+> "Dạ chào mọi người, mình ở HCM... chương trình có mở tại HCM không?"
+
+> "Cho em hỏi ngày 10/9 là khai giảng khóa 5 đúng không ạ?"
+
+> "Khi nào sẽ có kết quả vòng hồ sơ khóa 5?"
+
+> "Giờ đang tuyển sinh khóa mấy vậy ạ?"
+
+> "Em cần ôn những gì để thi đầu vào?"
+
+---
 
 ## §2. Impact & quyết định chọn
 
-| Ứng viên pain | Số tín hiệu / 750 | Tần suất xảy ra | Tổn thất mỗi lần | Khả thi trong hackathon |
-|---|---:|---|---|---|
-| Lịch, hạn, trạng thái vòng tuyển sinh | 136 (18,1%) | Theo từng mốc/khóa | Có thể lỡ hạn hoặc phải hỏi lại | Cao — có tài liệu lịch chính thức |
-| Điều kiện, đăng ký, hồ sơ | 93 (12,4%) | Trước mỗi lần ứng tuyển | Chuẩn bị sai/thiếu hồ sơ | Cao — có tài liệu tổng hợp |
-| Địa điểm và hình thức học | 47 (6,3%) | Trước khi cam kết tham gia | Quyết định sai về thời gian/di chuyển | Trung bình — thông tin có thể thay đổi |
-| Test và phỏng vấn | 24 (3,2%) | Trước vòng đánh giá | Ôn sai trọng tâm, tăng lo lắng | Trung bình — tài liệu chưa phủ toàn bộ |
-| Học phí, phụ cấp, học bổng | 7 (0,9%) | Khi cân nhắc chi phí | Kỳ vọng tài chính sai | Cao về impact, thấp hơn về số tín hiệu |
+### Bảng Impact
 
-Đã loại:
+| Ứng viên | Bao nhiêu người gặp | Tần suất | Mỗi lần tốn gì | Khả thi trong hackathon |
+|-----------|--------------------:|----------|----------------|-------------------------|
+| **Hỏi thông tin tuyển sinh** | **59/100 bài (59%)** | Hàng ngày | Chờ admin/học viên phản hồi từ 10–60 phút | Cao |
+| Hỏi tài liệu học | ~15/100 bài | Theo tuần | Mất thời gian tìm link tài liệu | Trung bình |
+| Hỏi lỗi Discord/VLearn | ~10/100 bài | Không thường xuyên | 5–10 phút xử lý | Cao |
 
-- Chatbot trả lời mọi nội dung cộng đồng: nguồn không đủ thẩm quyền.
-- AI chấm CV hoặc quyết định trúng tuyển: cost-of-error cao, vượt quyền.
-- Tự động nộp/sửa hồ sơ: cần xác thực, CRM và phê duyệt mà prototype chưa có.
+---
 
-Đã chọn: **một lớp tư vấn có truy xuất nguồn, validation và handoff**, vì nó phủ ba pain lớn nhất bằng cùng một quyết định cốt lõi: “evidence hiện có có đủ để trả lời hay phải hỏi lại/chuyển người?”.
+### Ứng viên đã loại
+
+#### 1. Hỗ trợ tìm tài liệu học
+
+**Lý do:**
+
+- Chủ yếu phục vụ học viên đã nhập học.
+- Đã có kênh discord và các nhóm zalo hỗ trợ
+- Tần suất xuất hiện thấp hơn.
+
+#### 2. Hỗ trợ lỗi Discord/VLearn
+
+**Lý do:**
+
+- Ít xuất hiện trong dữ liệu.
+- Có thể giải quyết bằng FAQ hoặc hướng dẫn có sẵn.
+- Không phải pain point lớn nhất.
+
+---
+
+### Ứng viên được chọn
+
+#### Hỗ trợ tư vấn tuyển sinh
+
+**Lý do lựa chọn:**
+
+- Chiếm **59%** tổng số bài đăng trong dataset.
+- Là nhóm câu hỏi xuất hiện thường xuyên nhất.
+- Nội dung có tính lặp lại cao.
+- Phần lớn câu trả lời đã tồn tại trên website hoặc FAQ.
+- Có thể xây dựng chatbot sử dụng Knowledge Base trong phạm vi hackathon.
+- Giảm tải cho đội ngũ tuyển sinh và giúp người quan tâm nhận phản hồi nhanh hơn.
 
 ## §3. Giải pháp tương tự đã nghiên cứu
 - [Salesforce Agentforce](https://www.salesforce.com/ap/agentforce/l):
