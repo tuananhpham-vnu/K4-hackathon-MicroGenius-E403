@@ -1,0 +1,19 @@
+<request>
+  <request_id>{{request_id}}</request_id>
+  <agent>{{agent}}</agent>
+  <context>
+    <session_id>{{session_id}}</session_id>
+    <conversation_goal>{{conversation_goal}}</conversation_goal>
+    <risk_level>{{risk_level}}</risk_level>
+  </context>
+  <query>{{query}}</query>
+  <history>{{history_xml}}</history>
+  <candidate_profile>{{candidate_profile_xml}}</candidate_profile>
+  <retrieved_evidence>{{evidence_xml}}</retrieved_evidence>
+  <source_registry>{{source_registry_xml}}</source_registry>
+  <instructions>
+    Xử lý query dựa trên context, history, candidate_profile và retrieved_evidence.
+    Với mỗi kết luận, giữ lại evidence_id và source_id liên quan.
+    Trả về validation, relevance score, source trust score và đề xuất HITL nếu cần.
+  </instructions>
+</request>
