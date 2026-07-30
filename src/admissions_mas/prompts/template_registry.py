@@ -3,11 +3,11 @@
 from pathlib import Path
 from typing import Any
 
-from .models import Evidence
-from .prompts import XmlPrompt
+from ..domain.models import Evidence
+from .xml_prompt import XmlPrompt
 
 
-CONFIG_DIR = Path(__file__).resolve().parents[2] / "config"
+CONFIG_DIR = Path(__file__).resolve().parents[3] / "config"
 COMMON_SYSTEM_PROMPT = (CONFIG_DIR / "system_prompt.txt").read_text(encoding="utf-8") if (CONFIG_DIR / "system_prompt.txt").exists() else ""
 
 

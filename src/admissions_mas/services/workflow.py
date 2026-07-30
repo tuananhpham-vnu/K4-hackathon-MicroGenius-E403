@@ -4,11 +4,11 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
-from .models import Evidence
+from ..domain.models import Evidence
+from ..infrastructure.text import now_iso, tokens
+from ..prompts.xml_prompt import XmlPrompt
+from ..retrieval.knowledge_base import KnowledgeBase
 from .observability import TraceLogger
-from .prompts import XmlPrompt
-from .retrieval import KnowledgeBase
-from .utils import now_iso, tokens
 
 
 class AdmissionsWorkflow:
@@ -98,5 +98,5 @@ class AdmissionsWorkflow:
 
 
 def create_workflow(repo_root: Path | None = None, logger: TraceLogger | None = None) -> AdmissionsWorkflow:
-    root = repo_root or Path(__file__).resolve().parents[2]
+    root = repo_root or Path(__file__).resolve().parents[3]
     return AdmissionsWorkflow(KnowledgeBase(root), logger=logger)

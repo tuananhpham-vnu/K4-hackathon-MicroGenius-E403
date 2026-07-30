@@ -19,7 +19,7 @@
 | R2 · Lát cắt & thiết kế | **15** | `spec.md` §4 |
 | R3 · Chỗ khó & kịch bản rủi ro | 11 | `spec.md` §5-§6 |
 | R4 · Kiểm thử | **15** | `spec.md` §7 + `eval/` |
-| R5 · Prototype chạy được | 8 | `codebase/` + demo |
+| R5 · Prototype chạy được | 8 | `src/` + `frontend/` + demo |
 | R6 · Validation với user | 8 | `validation/` |
 | R7 · Quy trình & repo | 3 | cấu trúc repo |
 

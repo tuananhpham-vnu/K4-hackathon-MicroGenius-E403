@@ -13,6 +13,10 @@ openai
 # Retrieval and document ingestion
 qdrant-client
 PyMuPDF
+firecrawl-py
+sentence-transformers
+weaviate-client
+python-dotenv
 
 # PostgreSQL persistence (sessions, profiles, evidence, audit logs)
 psycopg[binary]

@@ -8,7 +8,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from .utils import now_iso
+from ..infrastructure.text import now_iso
 
 
 class TraceLogger:
@@ -16,6 +16,10 @@ class TraceLogger:
 
     def __init__(self, log_path: Path | None = None, console: bool = True):
         configured_path = os.getenv("MAS_LOG_FILE")
+        if configured_path:
+            # dotenv interprets sequences such as ``\r`` in Windows paths.
+            # Normalize escaped/control separators before constructing Path.
+            configured_path = configured_path.replace("\r", "/").replace("\n", "/").replace("\\", "/")
         self.log_path = Path(configured_path) if configured_path else (log_path or Path("logs") / "mas.jsonl")
         self.console = console
         self._lock = Lock()
