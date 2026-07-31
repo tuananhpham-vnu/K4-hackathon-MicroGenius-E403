@@ -1,10 +1,8 @@
-# AI SPEC — Tư vấn tuyển sinh có căn cứ · Nhóm MicroGenius E403
 
-Hướng: **C — Làn mở**  
-Loại: **Tính năng mới**  
-Mức hiện tại: **Working prototype**
 
-> Chốt phạm vi: trợ lý chỉ tư vấn thông tin Chương trình AI Thực Chiến từ tài liệu cục bộ đã phê duyệt; không ra quyết định tuyển sinh và không sửa hồ sơ.
+# AI SPEC — [Tên lát cắt] · Nhóm [XX] · Zone [X]
+Hướng: C — Làn mở
+Loại: Tính năng mới
 
 ### §1. User & Job
 
@@ -180,6 +178,7 @@ Các chủ đề được hỏi nhiều nhất:
   | PAIR — Mental Models | Không dùng nhãn `accepted`/`rejected`; chỉ dùng nhãn phù hợp có điều kiện. |
   | PAIR — Errors & Graceful Failure | Tách lỗi thiếu source, source mâu thuẫn, query mơ hồ và vượt thẩm quyền thành các route khác nhau. |
 
+<<<<<<< HEAD
 ## §5. Kiểu lỗi — 4 lớp chỗ khó
 
 | ID | Lớp | Kịch bản | Phát hiện | Xử lý mong đợi |
@@ -192,17 +191,16 @@ Các chủ đề được hỏi nhiều nhất:
 | E06 | Vận hành | Thiếu package LangGraph tại máy demo | Import failure | Fallback domain workflow; vẫn chạy API/UI |
 | E07 | Bảo mật | Người dùng xin mật khẩu, thông tin cá nhân hoặc dữ liệu hồ sơ của người khác | Privacy/security keyword hoặc yêu cầu dữ liệu không thuộc phiên hiện tại | Từ chối, không retrieve |
 | E08 | Hệ thống | API lỗi hoặc server chưa chạy | Fetch exception | UI báo trạng thái thật và hướng dẫn thử lại; dùng fallback workflow nếu có, tuyệt đối không hiển thị câu trả lời giả |
+=======
+## §5. Kiểu lỗi — 4 lớp chỗ khó + kịch bản (≥8) [bảng theo guide §2.5]
+>>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
 
 ## §6. Bốn đường đi của trải nghiệm
-
-- **Happy path:** câu rõ → retrieve nguồn chính thức → validation pass → câu trả lời + source cards.
-- **Low-confidence:** câu quá ngắn hoặc thiếu profile → hỏi lại khóa/mốc/nội dung; không biến phỏng đoán thành kết luận.
-- **Failure/không căn cứ:** không có evidence đạt trust/relevance → trả “chưa tìm thấy bằng chứng đủ tin cậy” và đề nghị cán bộ xác nhận.
-- **Correction:** người dùng nhập câu mới trong composer; session giữ câu hỏi mới, chạy lại toàn bộ retrieval/validation và thay evidence panel.
-- **Ngoài phạm vi:** từ chối yêu cầu như thời tiết, mật khẩu, làm hộ.
-- **Đặc thù domain:** ngoại lệ, khiếu nại, phê duyệt, trúng tuyển và tình trạng hồ sơ luôn có cảnh báo cần cán bộ.
+- Happy path: · Low-confidence (②): · Failure/không căn cứ (①): · Correction (user sửa):
+- Khi bị đòi ngoài phạm vi (③): · Case đặc thù domain (④):
 
 ## §7. Kiểm thử
+<<<<<<< HEAD
 
 ### Chiều chất lượng
 
@@ -242,37 +240,20 @@ Ngoài golden set:
 - HTTP smoke test: health, trang `/` và query đều 200; query có evidence và validation pass.
 
 Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuyến/evidence tối thiểu, chưa có human grading cho semantic correctness từng câu và chưa đo latency/cost với LLM thật. Con số 100% không được diễn giải là 100% chính xác ngoài tập test.
+=======
+- Chiều chất lượng + định nghĩa kiểm chứng được:
+- Golden set (≥20 case theo cơ cấu trong guide §2.6, file trong eval/):
+- Quality bar (chốt từ 23:59, giữ nguyên sau đó): "Đạt khi ≥ ___% qua bộ, và ___"
+- Kết quả các lượt chạy (bảng % — cập nhật đến trước CP6):
+>>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
 
 ## §8. Phân công & kế hoạch
-
-
-| Thành viên | Mã học viên | Phần phụ trách |
-|---|---|---|
-| Nguyễn Đức Anh | 2A202601788 | Thu thập và xử lý dữ liệu cộng đồng |
-| Phạm Tuấn Anh | 2A202601070 | Backend, agent workflow, harness |
-| Nguyễn Thị Thương | 2A202601226 | Thu thập và chuẩn hóa tài liệu tuyển sinh |
-| Mai Tiến Dũng | 2A202601838 | Frontend, dữ liệu cộng đồng, tích hợp demo, eval, validation |
-
-### Validation CP5
-
-Kế hoạch 15 phút/người với ít nhất 3 ứng viên thật ngoài nhóm:
-
-1. “Bạn đang muốn ra quyết định gì sau khi hỏi câu này?”
-2. “Nguồn và cảnh báo hiện tại có đủ để bạn tin/biết bước tiếp theo không?”
-3. “Có đoạn nào khiến bạn hiểu rằng hệ thống đã quyết định thay cán bộ không?”
-
-Log cần ghi: tên/người thử, câu hỏi gốc, task success, điểm tin tưởng 1–5, chỗ hiểu sai, đề xuất và thay đổi sau feedback. **Tên 3 willing users và feedback log chưa tồn tại trong repo; đây là đầu vào từ người thật, không được tạo giả bằng code.**
-
-### Multi-prototype
-
-Hai phương án đã cân nhắc:
-
-- A — câu trả lời tĩnh đẹp, nhanh demo nhưng không có bằng chứng runtime;
-- B — UI gọi workflow có source/validation/audit, giao diện có thể ít “mượt” hơn nhưng kiểm chứng được.
-
-Chọn B vì rubric ưu tiên chuỗi quyết định và bằng chứng.
+- Phân công có tên: spec / evidence / prompt / code / demo
+- Willing users (≥3 tên) + kế hoạch vòng validation CP5 (3 câu hỏi, ai log):
+- Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn:
 
 ## §9. Changelog
+<<<<<<< HEAD
 
 | Thời điểm | Đổi gì | Vì sao |
 |---|---|---|
@@ -285,3 +266,6 @@ Chọn B vì rubric ưu tiên chuỗi quyết định và bằng chứng.
 | 2026-07-30 | Sửa chitchat, low-confidence và out-of-scope | Baseline 13/20; các nhánh này định tuyến sai |
 | 2026-07-30 | Thêm fallback khi máy chưa cài LangGraph | Đảm bảo demo tối thiểu vẫn chạy; cài đủ requirements sẽ dùng graph |
 
+=======
+| Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |
+>>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
