@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import os
 from urllib.parse import urlparse
 
@@ -14,6 +15,19 @@ from ..infrastructure.text import stable_id, tokens
 # one page VinUni actually publishes as authoritative.
 PRIORITY_SOURCE_URL = "https://vinuni.edu.vn/vi/thong-tin-tuyen-sinh-chuong-trinh-dao-tao-nhan-tai-ai-thuc-chien-khoa-co-ban/"
 PRIORITY_SOURCE_TITLE = "Thông tin tuyển sinh AI Thực Chiến (VinUni chính thức)"
+
+# The Firecrawl client's own `timeout=` kwarg is not sufficient on its own — a
+# stalled connection (DNS/network black-hole) can sit well past it. Every call
+# is run on a worker thread with a hard wall-clock deadline enforced from the
+# *caller's* side, so a request response can never hang indefinitely no matter
+# what the SDK or network does internally. The worker thread itself is left to
+# finish or die on its own; it just stops being anyone's problem.
+REQUEST_TIMEOUT_SECONDS = 10.0
+_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="web_search")
+
+
+def _call_with_deadline(func, *args, **kwargs):
+    return _EXECUTOR.submit(func, *args, **kwargs).result(timeout=REQUEST_TIMEOUT_SECONDS)
 
 
 class WebSearchService:
@@ -62,8 +76,8 @@ class WebSearchService:
         if self._priority_content is None:
             try:
                 from firecrawl import Firecrawl
-                client = Firecrawl(api_key=self.api_key, api_url=os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev"))
-                document = client.scrape(PRIORITY_SOURCE_URL, formats=["markdown"])
+                client = Firecrawl(api_key=self.api_key, api_url=os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev"), timeout=REQUEST_TIMEOUT_SECONDS, max_retries=1)
+                document = _call_with_deadline(client.scrape, PRIORITY_SOURCE_URL, formats=["markdown"])
                 self._priority_content = str(getattr(document, "markdown", "") or "")
             except Exception:
                 # Cloud/network failures must not take down the rest of retrieval.
@@ -75,8 +89,8 @@ class WebSearchService:
             return []
         try:
             from firecrawl import Firecrawl
-            client = Firecrawl(api_key=self.api_key, api_url=os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev"))
-            result = client.search(query, sources=["web"], limit=limit)
+            client = Firecrawl(api_key=self.api_key, api_url=os.getenv("FIRECRAWL_API_URL", "https://api.firecrawl.dev"), timeout=REQUEST_TIMEOUT_SECONDS, max_retries=1)
+            result = _call_with_deadline(client.search, query, sources=["web"], limit=limit)
         except Exception:
             return []
 

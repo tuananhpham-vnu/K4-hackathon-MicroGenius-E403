@@ -311,7 +311,7 @@ function renderMessageHtml(message) {
   return `
     <div class="message-row">
       <div class="avatar">AI</div>
-      <article class="bubble" data-ai-answer>${formatAgentText(message.text)}</article>
+      <article class="bubble" data-ai-answer>${formatAgentText(message.text, message.sources || [])}</article>
     </div>
   `;
 }
@@ -327,11 +327,11 @@ function appendMessageToDom(message) {
   return row;
 }
 
-function updatePendingMessage(row, { text, statusText, traceText, sourceCount, retryQuestion }) {
+function updatePendingMessage(row, { text, statusText, traceText, sourceCount, retryQuestion, sources }) {
   if (!row) return;
   const bubble = row.querySelector("[data-ai-answer]") || row;
   bubble.innerHTML = `
-    ${formatAgentText(text)}
+    ${formatAgentText(text, sources || [])}
     ${statusText ? `<p class="subtle">${escapeHtml(statusText)}</p>` : ""}
     ${traceText ? `<p class="subtle">${escapeHtml(traceText)}</p>` : ""}
     ${sourceCount ? `<button class="source-toggle" type="button" data-show-sources>Xem nguồn (${sourceCount})</button>` : ""}
@@ -392,18 +392,20 @@ async function askQuestion(question) {
       // Trace log lookup is best-effort only — the answer itself already succeeded.
     }
 
+    const uniqueSources = [...new Map((data.sources || []).map((source) => [source.source_id, source])).values()];
+
     updatePendingMessage(pendingRow, {
       text: data.response,
       statusText: status,
       traceText,
-      sourceCount: (data.sources || []).length,
+      sourceCount: uniqueSources.length,
+      sources: uniqueSources,
     });
 
-    conversation.push({ role: "assistant", text: data.response });
+    conversation.push({ role: "assistant", text: data.response, sources: uniqueSources });
     saveConversation(conversation);
 
     const evidenceBySource = new Map((data.evidence || []).map((item) => [item.source_id, item]));
-    const uniqueSources = [...new Map((data.sources || []).map((source) => [source.source_id, source])).values()];
     if (sourceList) {
       sourceList.innerHTML = uniqueSources.length
         ? uniqueSources.map((source) => `
@@ -411,7 +413,7 @@ async function askQuestion(question) {
               <span class="page-icon">S</span>
               <span>
                 <strong>${escapeHtml(source.title)}</strong>
-                <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)} · <a href="${escapeHtml(source.uri)}" target="_blank" rel="noreferrer">mở nguồn</a></span>
+                <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)} · <a href="${escapeHtml(resolveSourceHref(source.uri))}" target="_blank" rel="noreferrer">mở nguồn</a></span>
               </span>
             </div>
           `).join("")
@@ -905,11 +907,38 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+// A source.uri is either a full external URL (web search result, or a local
+// doc that names its own "Link chính thức") or a server-relative path like
+// "/docs/TaiLieuTongHop.md" (server.py's route for local docs without one).
+// Resolve the relative case against API_BASE so it still works when the
+// frontend is hosted separately from the API (see window.__API_BASE__ above).
+function resolveSourceHref(uri) {
+  if (!uri) return "";
+  if (/^https?:\/\//.test(uri)) return uri;
+  if (uri.startsWith("/")) return `${API_BASE || window.location.origin}${uri}`;
+  return uri;
+}
+
+function findSourceByTitle(sources, name) {
+  const target = name.trim().toLowerCase();
+  if (!target) return null;
+  return (
+    sources.find((source) => (source.title || "").toLowerCase() === target) ||
+    sources.find((source) => {
+      const title = (source.title || "").toLowerCase();
+      return title && (title.includes(target) || target.includes(title));
+    }) ||
+    null
+  );
+}
+
 // Renders the light markdown-ish syntax the agent actually produces (bold,
 // paragraph/bullet breaks, "[Nguồn A, Nguồn B]" citation groups) into safe
 // HTML. Always escapes first — the raw text comes from an LLM and must never
 // be trusted as markup. Only for AI bubbles; user bubbles stay plain-escaped.
-function formatAgentText(rawText) {
+// `sources` (the API's evidence source list) lets citation names become real
+// links to the matching document/page instead of just opening the side panel.
+function formatAgentText(rawText, sources = []) {
   const escaped = escapeHtml(rawText);
   const blocks = [];
   let paragraphLines = [];
@@ -938,11 +967,11 @@ function formatAgentText(rawText) {
     const bullet = line.match(/^[-*]\s+(.*)$/);
     if (bullet) {
       flushParagraph();
-      listItems.push(formatInline(bullet[1]));
+      listItems.push(formatInline(bullet[1], sources));
       continue;
     }
     flushList();
-    paragraphLines.push(formatInline(line));
+    paragraphLines.push(formatInline(line, sources));
   }
   flushParagraph();
   flushList();
@@ -950,18 +979,24 @@ function formatAgentText(rawText) {
   return blocks.join("") || `<p>${escaped}</p>`;
 }
 
-function formatInline(escapedLine) {
+function formatInline(escapedLine, sources) {
   const bolded = escapedLine.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
   return bolded.replace(/\[([^\]]+)\]/g, (match, inner) => {
     const trimmed = inner.trim();
     if (/^https?:\/\//.test(trimmed)) {
-      return `<a href="${trimmed}" target="_blank" rel="noreferrer">nguồn</a>`;
+      return `<a class="citation" href="${trimmed}" target="_blank" rel="noreferrer">nguồn</a>`;
     }
     return trimmed
       .split(",")
       .map((name) => name.trim())
       .filter(Boolean)
-      .map((name) => `<span class="citation" data-show-sources tabindex="0">${name}</span>`)
+      .map((name) => {
+        const source = findSourceByTitle(sources, name);
+        const href = source ? resolveSourceHref(source.uri) : "";
+        return href
+          ? `<a class="citation" href="${escapeHtml(href)}" target="_blank" rel="noreferrer">${name}</a>`
+          : `<span class="citation" data-show-sources tabindex="0">${name}</span>`;
+      })
       .join(" ");
   });
 }

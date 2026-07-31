@@ -1,5 +1,6 @@
 """Minimal HTTP API for the traceable admissions workflow."""
 
+import html
 import json
 import mimetypes
 import os
@@ -20,7 +21,7 @@ except ModuleNotFoundError:
 WORKFLOW = create_workflow(Path(__file__).resolve().parents[1])
 MAS = LangGraphAdmissionsMAS(WORKFLOW) if LangGraphAdmissionsMAS else None
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend"
-EXPOSE_TRACE_API = os.getenv("EXPOSE_TRACE_API", "").lower() in {"1", "true", "yes", "on"}
+DOCS_ROOT = (Path(__file__).resolve().parents[1] / "Tailieutubtc").resolve()
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -40,6 +41,24 @@ class Handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self) -> None:
         self._send("", 204, "text/plain; charset=utf-8")
 
+    def _serve_doc(self, name: str) -> None:
+        # Backs the citation/"mở nguồn" links for local admissions docs (see
+        # knowledge_base.py's Source.uri) so they resolve to a real, clickable
+        # page instead of a local filesystem path the browser can't open.
+        candidate = (DOCS_ROOT / name).resolve()
+        if DOCS_ROOT not in candidate.parents or candidate.suffix != ".md" or not candidate.is_file():
+            self._send("Not found", 404, "text/plain; charset=utf-8")
+            return
+        body = (
+            "<!doctype html><meta charset='utf-8'>"
+            f"<title>{html.escape(candidate.stem)}</title>"
+            "<body style=\"max-width:820px;margin:40px auto;padding:0 20px;"
+            "font:16px/1.65 system-ui,sans-serif;white-space:pre-wrap\">"
+            f"{html.escape(candidate.read_text(encoding='utf-8'))}"
+            "</body>"
+        )
+        self._send(body, content_type="text/html; charset=utf-8")
+
     def do_GET(self) -> None:
         request_path = urlparse(self.path).path
         if request_path == "/api/health":
@@ -54,6 +73,8 @@ class Handler(BaseHTTPRequestHandler):
                 self._send("Not found", 404, "text/plain; charset=utf-8")
                 return
             self._send(json.dumps(WORKFLOW.logger.read(), ensure_ascii=False), content_type="application/json")
+        elif request_path.startswith("/docs/"):
+            self._serve_doc(request_path.removeprefix("/docs/"))
         else:
             relative = "index.html" if request_path == "/" else request_path.lstrip("/")
             candidate = (WEB_ROOT / relative).resolve()
