@@ -7,7 +7,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from dotenv import load_dotenv
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
+load_dotenv(Path(__file__).resolve().parents[1] / ".env", override=True)
 
 from admissions_mas.services.workflow import create_workflow
 
