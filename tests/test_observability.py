@@ -21,6 +21,13 @@ class ObservabilityTests(unittest.TestCase):
             self.assertEqual(records[0]["step"], "validator")
             json.dumps(records)
 
+    def test_trace_logger_skips_incomplete_lines(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mas.jsonl"
+            path.write_text('{"request_id":"ok"}\n{"request_id":', encoding="utf-8")
+            records = TraceLogger(path, console=False).read()
+            self.assertEqual(records, [{"request_id": "ok"}])
+
 
 if __name__ == "__main__":
     unittest.main()

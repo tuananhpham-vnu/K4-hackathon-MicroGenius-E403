@@ -22,7 +22,9 @@ class SemanticRetriever:
 
     @property
     def configured(self) -> bool:
-        return bool(self.weaviate_url and self.weaviate_api_key)
+        placeholders = ("your-", "example", "changeme")
+        values = (self.weaviate_url.strip().lower(), self.weaviate_api_key.strip().lower())
+        return all(values) and not any(marker in value for value in values for marker in placeholders)
 
     def _load_model(self):
         if self._model is None:

@@ -1,6 +1,16 @@
 // Set window.__API_BASE__ before loading this file when the frontend is hosted elsewhere.
 const configuredApiBase = new URLSearchParams(window.location.search).get("api_base");
 const API_BASE = window.__API_BASE__ || configuredApiBase || (window.location.port === "8765" ? "" : "http://127.0.0.1:8765");
+const chatHistory = [];
+
+function sessionId() {
+  let value = sessionStorage.getItem("admission-session");
+  if (!value) {
+    value = globalThis.crypto?.randomUUID?.() || `web_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+    sessionStorage.setItem("admission-session", value);
+  }
+  return value;
+}
 
 const navItems = [
   { id: "chat", label: "Trò chuyện", icon: "message" },
@@ -281,23 +291,35 @@ async function runChat(question) {
   sourceList.innerHTML = '<p class="subtle">Đang kiểm tra nguồn và độ liên quan…</p>';
 
   try {
+    const history = chatHistory.slice(-10);
     const response = await fetch(`${API_BASE}/api/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         query: question,
-        request_id: `web_${Date.now()}`,
-        context: { session_id: sessionStorage.getItem("admission-session") || "web-demo" },
+        request_id: `web_${Date.now()}_${Math.random().toString(16).slice(2, 8)}`,
+        context: { session_id: sessionId() },
+        history,
       }),
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Không thể gọi dịch vụ tư vấn");
+    chatHistory.push(
+      { id: `user_${Date.now()}`, role: "user", text: question },
+      { id: `assistant_${Date.now()}`, role: "assistant", text: data.response || "" },
+    );
 
     const validation = data.validation || {};
     const status = validation.passed
       ? `Đã kiểm chứng ${validation.evidence_count || 0} bằng chứng · relevance ${Number(validation.avg_relevance || 0).toFixed(2)} · trust ${Number(validation.avg_source_trust || 0).toFixed(2)}`
       : "Chưa đủ bằng chứng — cần tư vấn viên";
-    const logs = await (await fetch(`${API_BASE}/api/logs`)).json();
+    let logs = [];
+    try {
+      const logResponse = await fetch(`${API_BASE}/api/logs`);
+      if (logResponse.ok) logs = await logResponse.json();
+    } catch {
+      // Production disables the internal trace endpoint by default.
+    }
     const requestLogs = logs.filter((item) => item.request_id === data.request_id);
     answer.innerHTML = `
       <p>${escapeHtml(data.response)}</p>

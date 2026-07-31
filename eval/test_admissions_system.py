@@ -21,6 +21,18 @@ class TraceabilityTests(unittest.TestCase):
         self.assertEqual(parsed["context"]["session_id"], "s1")
         self.assertEqual(parsed["candidate_profile"]["major"], "AI")
 
+    def test_xml_accepts_arbitrary_context_and_profile_keys(self):
+        xml = XmlPrompt.build(
+            "req_keys",
+            "câu hỏi",
+            {"session id": "s1", "123-invalid": "ok"},
+            profile={"ngành học": "AI"},
+        )
+        parsed = XmlPrompt.parse(xml)
+        self.assertEqual(parsed["context"]["session id"], "s1")
+        self.assertEqual(parsed["context"]["123-invalid"], "ok")
+        self.assertEqual(parsed["candidate_profile"]["ngành học"], "AI")
+
     def test_query_keeps_source_and_scores(self):
         result = self.workflow.answer("Chương trình học kéo dài bao lâu?")
         self.assertIn("request_id", result)

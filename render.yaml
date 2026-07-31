@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: microgenius-admissions
+    runtime: python
+    plan: free
+    buildCommand: pip install --no-cache-dir -r requirements-deploy.txt
+    startCommand: python src/server.py
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.5
+      - key: MAS_LOG_FILE
+        value: /tmp/mas.jsonl
+      - key: EXPOSE_TRACE_API
+        value: "false"
+      - key: WEB_ALLOWED_DOMAINS
+        value: vinai.io,vinuni.edu.vn
+      - key: GEMINI_API_KEY
+        sync: false

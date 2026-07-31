@@ -165,4 +165,10 @@ class LangGraphAdmissionsMAS:
     def invoke(self, query: str, *, request_id: str, context: dict[str, Any] | None = None,
                history: list[dict[str, str]] | None = None, profile: dict[str, Any] | None = None) -> dict[str, Any]:
         initial: MASState = {"request_id": request_id, "query": query, "context": context or {}, "history": history or [], "profile": profile or {}, "retry_count": 0}
-        return dict(self.graph.invoke(initial))
+        result = dict(self.graph.invoke(initial))
+        result["sources"] = [
+            self.workflow.kb.sources[item["source_id"]].__dict__
+            for item in result.get("evidence", [])
+            if item.get("source_id") in self.workflow.kb.sources
+        ]
+        return result

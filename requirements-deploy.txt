@@ -1,0 +1,8 @@
+# Minimal dependencies used by the public web runtime.
+python-dotenv
+langgraph
+
+# Optional providers. Uncomment only when their feature is configured.
+# firecrawl-py
+# sentence-transformers
+# weaviate-client

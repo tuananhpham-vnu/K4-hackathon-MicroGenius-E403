@@ -20,7 +20,8 @@ class TraceLogger:
             # dotenv interprets sequences such as ``\r`` in Windows paths.
             # Normalize escaped/control separators before constructing Path.
             configured_path = configured_path.replace("\r", "/").replace("\n", "/").replace("\\", "/")
-        self.log_path = Path(configured_path) if configured_path else (log_path or Path("logs") / "mas.jsonl")
+        # An explicit dependency-injected path must win in tests/evaluation.
+        self.log_path = log_path or (Path(configured_path) if configured_path else Path("logs") / "mas.jsonl")
         self.console = console
         self._lock = Lock()
 
@@ -38,4 +39,18 @@ class TraceLogger:
     def read(self) -> list[dict[str, Any]]:
         if not self.log_path.exists():
             return []
-        return [json.loads(line) for line in self.log_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+        records = []
+        # A process can be interrupted midway through its final append. Keep
+        # earlier valid trace records usable instead of failing the whole API.
+        with self._lock:
+            lines = self.log_path.read_text(encoding="utf-8", errors="replace").splitlines()
+        for line in lines:
+            if not line.strip():
+                continue
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(record, dict):
+                records.append(record)
+        return records
