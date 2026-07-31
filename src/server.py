@@ -2,6 +2,7 @@
 
 import json
 import mimetypes
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
@@ -19,6 +20,7 @@ except ModuleNotFoundError:
 WORKFLOW = create_workflow(Path(__file__).resolve().parents[1])
 MAS = LangGraphAdmissionsMAS(WORKFLOW) if LangGraphAdmissionsMAS else None
 WEB_ROOT = Path(__file__).resolve().parents[1] / "frontend"
+EXPOSE_TRACE_API = os.getenv("EXPOSE_TRACE_API", "").lower() in {"1", "true", "yes", "on"}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -43,8 +45,14 @@ class Handler(BaseHTTPRequestHandler):
         if request_path == "/api/health":
             self._send(json.dumps({"status": "ok", "sources": len(WORKFLOW.kb.sources), "documents": len(WORKFLOW.kb.documents), "langgraph_available": bool(MAS), "web_search_available": bool(MAS and MAS.web_search.available)}), content_type="application/json")
         elif request_path == "/api/audit":
+            if not EXPOSE_TRACE_API:
+                self._send("Not found", 404, "text/plain; charset=utf-8")
+                return
             self._send(json.dumps(WORKFLOW.audit_log, ensure_ascii=False), content_type="application/json")
         elif request_path == "/api/logs":
+            if not EXPOSE_TRACE_API:
+                self._send("Not found", 404, "text/plain; charset=utf-8")
+                return
             self._send(json.dumps(WORKFLOW.logger.read(), ensure_ascii=False), content_type="application/json")
         else:
             relative = "index.html" if request_path == "/" else request_path.lstrip("/")
@@ -91,5 +99,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print("Traceable Admissions MAS: http://127.0.0.1:8765")
-    ThreadingHTTPServer(("127.0.0.1", 8765), Handler).serve_forever()
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8765"))
+    print(f"Traceable Admissions MAS: http://{host}:{port}")
+    ThreadingHTTPServer((host, port), Handler).serve_forever()
