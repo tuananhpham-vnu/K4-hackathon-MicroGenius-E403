@@ -31,5 +31,4 @@ pytest
 # Optional tracing/observability used by the agent workflow
 opentelemetry-api
 opentelemetry-sdk
-
-
+semantic_chunkers
