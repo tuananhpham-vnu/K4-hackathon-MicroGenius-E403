@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: microgenius-admissions
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements-deploy.txt
+    startCommand: python src/server.py
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.4
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL_NAME
+        value: gemini-3.5-flash-lite
+      - key: WEB_ALLOWED_DOMAINS
+        value: vinuni.edu.vn
+      - key: EXPOSE_TRACE_API
+        value: "false"

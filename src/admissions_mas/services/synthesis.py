@@ -21,7 +21,7 @@ class GeminiSynthesisService:
     def __init__(self) -> None:
         self.api_key = os.getenv("GEMINI_API_KEY", "")
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-3.5-flash-lite")
-        self.temperature = self._read_float(("GEMINI_TEMPERATURE", "TEMP"), 0.2)
+        self.temperature = self._read_float(("GEMINI_TEMPERATURE", "TEMP"), 0.3)
         self._client = None
 
     @property
