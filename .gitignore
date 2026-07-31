@@ -8,3 +8,6 @@ node_modules/
 __pycache__/
 *.py[cod]
 logs/
+data/raw_data/
+scripts/__pycache__/
+venv

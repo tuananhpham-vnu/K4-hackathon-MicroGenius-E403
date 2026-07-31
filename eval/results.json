@@ -149,7 +149,7 @@
       },
       "actual_intent": "program_recommendation",
       "actual_human": false,
-      "evidence_count": 2
+      "evidence_count": 1
     },
     {
       "id": "G12",
@@ -202,7 +202,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": true,
-      "evidence_count": 4
+      "evidence_count": 3
     },
     {
       "id": "G16",

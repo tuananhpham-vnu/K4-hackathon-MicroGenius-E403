@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 
-from .utils import now_iso
+from ..infrastructure.text import now_iso
 
 
 @dataclass
@@ -25,3 +25,5 @@ class Evidence:
     query: str
     retrieval_method: str = "lexical_overlap"
     source_check_passed: bool = False
+    source_title: str = ""
+    source_uri: str = ""

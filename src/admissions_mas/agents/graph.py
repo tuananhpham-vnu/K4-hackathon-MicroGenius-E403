@@ -1,7 +1,7 @@
 """LangGraph implementation of the admissions MAS workflow.
 
 The graph keeps the framework orchestration separate from the concrete
-retrieval and validation services in ``admissions_system.py``.
+retrieval and validation services in ``admissions_mas.services.workflow``.
 """
 
 from __future__ import annotations
@@ -10,11 +10,12 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from mas.models import Evidence
-from mas.harness import AgentHarness, ToolSpec
-from mas.prompts import XmlPrompt
-from mas.prompt_templates import prompt_messages
-from mas.workflow import AdmissionsWorkflow
+from ..domain.models import Evidence
+from ..prompts.template_registry import prompt_messages
+from ..prompts.xml_prompt import XmlPrompt
+from ..retrieval.web_search import WebSearchService
+from ..services.workflow import AdmissionsWorkflow
+from .harness import AgentHarness, ToolSpec
 
 
 class MASState(TypedDict, total=False):
@@ -43,7 +44,9 @@ class LangGraphAdmissionsMAS:
     def __init__(self, workflow: AdmissionsWorkflow, harness: AgentHarness | None = None):
         self.workflow = workflow
         self.harness = harness or AgentHarness()
+        self.web_search = WebSearchService(self.workflow.kb)
         self.harness.register_tool(ToolSpec("knowledge_base.search", "Search approved local knowledge base", True), self.workflow.kb.search)
+        self.harness.register_tool(ToolSpec("web.search", "Discover current web sources", True), self.web_search.search)
         self.harness.register_tool(ToolSpec("source_registry.lookup", "Resolve source metadata", True), lambda source_id: self.workflow.kb.sources.get(source_id))
         self.graph = self._build_graph()
 
@@ -107,8 +110,11 @@ class LangGraphAdmissionsMAS:
         if state.get("retry_count", 0):
             query += " " + " ".join(state.get("validation", {}).get("rejection_reasons", []))
         evidence = self.harness.invoke_tool("searcher", "knowledge_base.search", state, query=query, limit=8)
+        web_evidence = self.harness.invoke_tool("searcher", "web.search", state, query=query, limit=5)
+        evidence = evidence + web_evidence
         serialized = [item.__dict__ for item in evidence]
         self.workflow.logger.event(request_id=state["request_id"], step="tool_call", component="searcher", payload={"tool": "knowledge_base.search", "query": query, "result_count": len(serialized)})
+        self.workflow.logger.event(request_id=state["request_id"], step="tool_call", component="searcher", payload={"tool": "web.search", "available": self.web_search.available, "query": query, "result_count": len(web_evidence)})
         self.workflow._audit(state["request_id"], "searcher", {"evidence": serialized})
         return {"evidence": serialized, "retry_count": state.get("retry_count", 0) + 1, "harness_plan": plan}
 
@@ -146,14 +152,23 @@ class LangGraphAdmissionsMAS:
         elif not evidence:
             response = "Mình chưa tìm thấy bằng chứng đủ tin cậy cho câu hỏi này. Bạn vui lòng cung cấp thêm chi tiết hoặc chờ cán bộ tuyển sinh xác nhận."
         else:
-            snippets = " ".join(item["quote"] for item in evidence[:3])
-            response = f"Theo các tài liệu hiện có, thông tin liên quan là: {snippets[:900]} Đây là tư vấn tham khảo dựa trên dữ liệu cục bộ, không phải quyết định tuyển sinh."
+            response = self.workflow.synthesis.synthesize(
+                query=state["query"],
+                evidence=[Evidence(**item) for item in evidence],
+                risk_level=state["orchestration"]["risk_level"],
+                validation=validation,
+                human_required=bool(state.get("human_required") or validation.get("needs_human")),
+                profile=state.get("profile", {}),
+                history=state.get("history", []),
+            )
         if state.get("human_required") or validation.get("needs_human"):
-            response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
+            human_note = "cán bộ tuyển sinh"
+            if human_note not in response.lower():
+                response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
         prompt_xml = XmlPrompt.build(state["request_id"], state["query"], state.get("context"), state.get("history"), state.get("profile"), [Evidence(**item) for item in evidence])
         messages = prompt_messages(request_id=state["request_id"], agent="synthesis", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"), evidence=[Evidence(**item) for item in evidence])
         output_check = self.harness.guardrails.check_output(response, evidence, state["orchestration"]["risk_level"])
-        self.workflow._audit(state["request_id"], "synthesis", {"response": response, "citation_count": len(evidence), "guardrail": output_check.__dict__})
+        self.workflow._audit(state["request_id"], "synthesis", {"response": response, "citation_count": len(evidence), "model": self.workflow.synthesis.model_name if self.workflow.synthesis.configured else "fallback", "guardrail": output_check.__dict__})
         return {"response": response, "prompt_xml": prompt_xml, "evidence": evidence, "system_prompt": messages[0]["content"], "user_prompt": messages[1]["content"], "harness_plan": plan, "guardrail_result": {"passed": output_check.passed, "reasons": output_check.reasons}}
 
     def invoke(self, query: str, *, request_id: str, context: dict[str, Any] | None = None,
