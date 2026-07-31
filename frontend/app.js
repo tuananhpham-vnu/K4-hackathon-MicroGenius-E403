@@ -310,7 +310,7 @@ function renderMessageHtml(message) {
   return `
     <div class="message-row">
       <div class="avatar">AI</div>
-      <article class="bubble" data-ai-answer><p>${escapeHtml(message.text)}</p></article>
+      <article class="bubble" data-ai-answer>${formatAgentText(message.text)}</article>
     </div>
   `;
 }
@@ -330,7 +330,7 @@ function updatePendingMessage(row, { text, statusText, traceText, sourceCount, r
   if (!row) return;
   const bubble = row.querySelector("[data-ai-answer]") || row;
   bubble.innerHTML = `
-    <p>${escapeHtml(text)}</p>
+    ${formatAgentText(text)}
     ${statusText ? `<p class="subtle">${escapeHtml(statusText)}</p>` : ""}
     ${traceText ? `<p class="subtle">${escapeHtml(traceText)}</p>` : ""}
     ${sourceCount ? `<button class="source-toggle" type="button" data-show-sources>Xem nguồn (${sourceCount})</button>` : ""}
@@ -902,6 +902,67 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+// Renders the light markdown-ish syntax the agent actually produces (bold,
+// paragraph/bullet breaks, "[Nguồn A, Nguồn B]" citation groups) into safe
+// HTML. Always escapes first — the raw text comes from an LLM and must never
+// be trusted as markup. Only for AI bubbles; user bubbles stay plain-escaped.
+function formatAgentText(rawText) {
+  const escaped = escapeHtml(rawText);
+  const blocks = [];
+  let paragraphLines = [];
+  let listItems = [];
+
+  const flushParagraph = () => {
+    if (paragraphLines.length) {
+      blocks.push(`<p>${paragraphLines.join(" ")}</p>`);
+      paragraphLines = [];
+    }
+  };
+  const flushList = () => {
+    if (listItems.length) {
+      blocks.push(`<ul>${listItems.map((item) => `<li>${item}</li>`).join("")}</ul>`);
+      listItems = [];
+    }
+  };
+
+  for (const rawLine of escaped.split("\n")) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushParagraph();
+      flushList();
+      continue;
+    }
+    const bullet = line.match(/^[-*]\s+(.*)$/);
+    if (bullet) {
+      flushParagraph();
+      listItems.push(formatInline(bullet[1]));
+      continue;
+    }
+    flushList();
+    paragraphLines.push(formatInline(line));
+  }
+  flushParagraph();
+  flushList();
+
+  return blocks.join("") || `<p>${escaped}</p>`;
+}
+
+function formatInline(escapedLine) {
+  const bolded = escapedLine.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+  return bolded.replace(/\[([^\]]+)\]/g, (match, inner) => {
+    const trimmed = inner.trim();
+    if (/^https?:\/\//.test(trimmed)) {
+      return `<a href="${trimmed}" target="_blank" rel="noreferrer">nguồn</a>`;
+    }
+    return trimmed
+      .split(",")
+      .map((name) => name.trim())
+      .filter(Boolean)
+      .map((name) => `<span class="citation" data-show-sources tabindex="0">${name}</span>`)
+      .join(" ");
+  });
 }
 
 window.addEventListener("hashchange", render);

@@ -554,6 +554,39 @@ p {
   font-size: 17px;
 }
 
+.bubble p + p {
+  margin-top: 10px;
+}
+
+.bubble ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.bubble ul li {
+  margin: 4px 0;
+}
+
+.citation {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  margin: 0 2px;
+  color: var(--blue);
+  background: #eef3ff;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.8;
+  cursor: pointer;
+}
+
+.citation:hover,
+.citation:focus-visible {
+  background: #dfe8ff;
+  outline: none;
+}
+
 .check-list {
   display: grid;
   gap: 8px;

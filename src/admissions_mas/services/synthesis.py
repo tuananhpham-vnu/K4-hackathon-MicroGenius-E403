@@ -107,6 +107,7 @@ Quy tắc bắt buộc:
 - Không bịa thêm chức năng không có (không đặt lịch hộ, không xử lý/phê duyệt hồ sơ, không xác nhận kết quả tuyển sinh).
 - Không nhắc chi tiết kỹ thuật (vector, agent, LLM, hybrid search, token...).
 - Giọng thân thiện, chuyên nghiệp, tối đa khoảng 3-4 câu.
+- Định dạng: chỉ dùng **in đậm** cho từ khóa quan trọng và gạch đầu dòng "- " nếu cần liệt kê; không dùng heading (#), bảng, code block hay markdown khác.
 
 Câu hỏi của người dùng:
 {query}
@@ -184,6 +185,7 @@ Quy tắc bắt buộc:
 - Không đưa ra quyết định tuyển sinh chính thức.
 - Nếu human_required=true hoặc risk_level=high, thêm câu rằng cán bộ tuyển sinh cần xác nhận trước khi kết luận chính thức.
 - Không nhắc các chi tiết kỹ thuật như token, vector, hybrid search, agent, Validator.
+- Định dạng: chỉ dùng **in đậm** cho từ khóa quan trọng và gạch đầu dòng "- " nếu cần liệt kê; không dùng heading (#), bảng, code block hay markdown khác.
 
 User query:
 {query}
