@@ -9,13 +9,16 @@ langgraph
 langchain-core
 langchain-openai
 openai
+google-genai
 
 # Retrieval and document ingestion
 qdrant-client
 PyMuPDF
 firecrawl-py
+semantic-chunkers
 sentence-transformers
 weaviate-client
+grpcio>=1.76.0
 python-dotenv
 
 # PostgreSQL persistence (sessions, profiles, evidence, audit logs)
@@ -28,3 +31,5 @@ pytest
 # Optional tracing/observability used by the agent workflow
 opentelemetry-api
 opentelemetry-sdk
+
+

@@ -49,5 +49,6 @@ class WebSearchService:
                 quote=snippet[:2000], locator=url, relevance_score=round(relevance, 3),
                 source_trust_score=source.trust_score, query=query,
                 retrieval_method="firecrawl_search", source_check_passed=approved,
+                source_title=source.title, source_uri=source.uri,
             ))
         return evidence

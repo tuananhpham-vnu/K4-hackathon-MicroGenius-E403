@@ -4,9 +4,35 @@ import json
 import re
 from pathlib import Path
 
+from semantic_chunkers import RegexChunker
+
 from ..domain.models import Evidence, Source
 from ..infrastructure.text import stable_id, tokens
 from .semantic_retriever import SemanticRetriever
+
+
+regex_chunker = RegexChunker()
+
+
+def regex_chunks(text: str, *, min_chars: int = 40, max_chars: int = 2500) -> list[str]:
+    """Split documents with semantic_chunkers.RegexChunker for RAG indexing."""
+    raw_chunks = regex_chunker([text])
+    chunks: list[str] = []
+    for chunk in _flatten_chunks(raw_chunks):
+        splits = getattr(chunk, "splits", None)
+        raw_text = " ".join(splits) if splits else str(chunk)
+        clean = re.sub(r"\s+", " ", raw_text).strip()
+        if len(clean) > min_chars:
+            chunks.append(clean[:max_chars])
+    return chunks
+
+
+def _flatten_chunks(items):
+    for item in items:
+        if isinstance(item, list):
+            yield from _flatten_chunks(item)
+        else:
+            yield item
 
 
 class KnowledgeBase:
@@ -24,6 +50,15 @@ class KnowledgeBase:
         self.sources[source.source_id] = source
         return source
 
+    def _document(self, source: Source, locator: str, text: str) -> dict[str, str]:
+        return {
+            "source_id": source.source_id,
+            "locator": locator,
+            "text": text[:2500],
+            "source_title": source.title,
+            "source_uri": source.uri,
+        }
+
     def _load(self) -> None:
         legacy_root = self.repo_root / "data" / "vlearn-pack"
         for path in sorted((legacy_root / "transcript").glob("*.md")):
@@ -37,7 +72,8 @@ class KnowledgeBase:
                 for row in csv.DictReader(handle):
                     content = (row.get("content") or "").strip()
                     if len(content) > 25:
-                        self.documents.append({"source_id": source.source_id, "locator": f"{row.get('conversation_id', 'conversation')}/{row.get('message_id', 'message')}", "text": re.sub(r"\s+", " ", content)[:2500]})
+                        locator = f"{row.get('conversation_id', 'conversation')}/{row.get('message_id', 'message')}"
+                        self.documents.append(self._document(source, locator, re.sub(r"\s+", " ", content)))
 
         # The current repository stores the approved admissions corpus here.
         # Keeping this discovery explicit prevents a silently empty knowledge base.
@@ -49,17 +85,10 @@ class KnowledgeBase:
             self._index_community_json(path)
 
     def _index_markdown(self, path: Path, source: Source) -> None:
-        chunks = re.split(r"\n\s*\n|(?<=[.!?])\s+(?=[A-ZÀ-ỴĐ])", path.read_text(encoding="utf-8"))
-        for index, chunk in enumerate(chunks, 1):
-            clean = re.sub(r"\s+", " ", chunk).strip()
-            if len(clean) <= 40:
-                continue
-            marker = re.search(r"\[(T\d+-\d+)\]", chunk)
-            self.documents.append({
-                "source_id": source.source_id,
-                "locator": marker.group(1) if marker else f"paragraph-{index}",
-                "text": clean[:2500],
-            })
+        for index, clean in enumerate(regex_chunks(path.read_text(encoding="utf-8")), 1):
+            marker = re.search(r"\[(T\d+-\d+)\]", clean)
+            locator = marker.group(1) if marker else f"paragraph-{index}"
+            self.documents.append(self._document(source, locator, clean))
 
     def _index_community_json(self, path: Path) -> None:
         try:
@@ -74,18 +103,14 @@ class KnowledgeBase:
                 continue
             text = str(record.get("text") or "").strip()
             if len(text) > 25:
-                self.documents.append({
-                    "source_id": source.source_id,
-                    "locator": f"post-{index}",
-                    "text": re.sub(r"\s+", " ", text)[:2500],
-                })
+                self.documents.append(self._document(source, f"post-{index}", re.sub(r"\s+", " ", text)))
 
     def search(self, query: str, limit: int = 8) -> list[Evidence]:
         if self.semantic.configured:
             try:
-                semantic_results = self.semantic.search(query, limit=limit)
-                if semantic_results:
-                    return semantic_results
+                hybrid_results = self.semantic.search(query, limit=limit)
+                if hybrid_results:
+                    return hybrid_results
             except Exception:
                 # Cloud/model failures must not take down the local fallback.
                 pass
@@ -110,9 +135,15 @@ class KnowledgeBase:
             key = f"{source.source_id}:{document['locator']}:{query}"
             results.append(Evidence(
                 evidence_id=f"ev_{len(results) + 1:03d}_{hashlib.sha1(key.encode()).hexdigest()[:8]}",
-                source_id=source.source_id, quote=document["text"], locator=document["locator"],
-                relevance_score=round(score, 3), source_trust_score=source.trust_score,
-                query=query, source_check_passed=source.authority == "approved_local" and source.trust_score >= 0.7,
+                source_id=source.source_id,
+                quote=document["text"],
+                locator=document["locator"],
+                relevance_score=round(score, 3),
+                source_trust_score=source.trust_score,
+                query=query,
+                source_check_passed=source.authority == "approved_local" and source.trust_score >= 0.7,
+                source_title=source.title,
+                source_uri=source.uri,
             ))
             if len(results) >= limit:
                 break

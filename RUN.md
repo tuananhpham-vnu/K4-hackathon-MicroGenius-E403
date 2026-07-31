@@ -35,7 +35,7 @@ pip install -r requirements.txt
 ## Chạy web app
 
 ```powershell
-pip install -r requirements.txt
+python scripts/upload_weaviate_documents.py # upload tài liệu
 python src/server.py
 ```
 
@@ -47,6 +47,14 @@ API `POST /api/query` nhận JSON gồm `query`, `context`, `history`, `profile`
 
 Mỗi request được trace thành JSONL tại `logs/mas.jsonl`. Có thể xem trace trong runtime bằng `GET /api/logs`. Console cũng in từng bước theo format `[MAS] step | component | request_id`. Có thể đổi file log bằng biến môi trường `MAS_LOG_FILE`.
 
+Synthesis dùng Gemini nếu có API key; nếu thiếu key hoặc Gemini lỗi, hệ thống tự fallback sang câu trả lời grounded theo evidence:
+
+```powershell
+$env:GEMINI_API_KEY="..."
+$env:GEMINI_MODEL_NAME="gemini-3.5-flash-lite"
+python src/server.py
+```
+
 Web search dùng Firecrawl và được gọi qua `AgentHarness` bằng tool `web.search`. Cấu hình trước khi chạy:
 
 ```powershell
@@ -57,23 +65,24 @@ python src/server.py
 
 Nếu chưa có `FIRECRAWL_API_KEY`, hệ thống vẫn chạy local retrieval; health endpoint sẽ báo `web_search_available: false`. Web result ngoài allowlist chỉ là candidate evidence và không được Validator dùng làm nguồn chính thức.
 
-Semantic retrieval với Weaviate:
+Hybrid retrieval với Weaviate:
 
 ```powershell
 python scripts/index_documents.py
 python src/server.py
 ```
 
-Script đọc tài liệu trong `Tailieutubtc/`, chunk bằng regex, encode bằng `EMBEDDING_MODEL_NAME` và upsert vector vào collection `WEAVIATE_COLLECTION`. Khi collection chưa có dữ liệu hoặc cloud/model lỗi, Searcher tự fallback về local lexical retrieval.
+Script đọc tài liệu trong `Tailieutubtc/`, chunk bằng regex, encode bằng `EMBEDDING_MODEL_NAME` và upsert vector vào collection `WEAVIATE_COLLECTION`. Khi query, Searcher dùng Weaviate `hybrid` search: BM25 query + embedding vector, không dùng reranker model. Khi collection chưa có dữ liệu hoặc cloud/model lỗi, Searcher tự fallback về local lexical retrieval.
 
-Semantic retrieval với Weaviate:
+Upload thêm tài liệu RAG vào Weaviate:
 
 ```powershell
-python scripts/index_documents.py
+python scripts/upload_weaviate_documents.py --path .\Tailieutubtc
+python scripts/upload_weaviate_documents.py --path .\docs\new-info.md --title "Tên tài liệu" --source-uri "https://example.com/source"
 python src/server.py
 ```
 
-Script đọc tài liệu trong `Tailieutubtc/`, chunk bằng regex, encode bằng `EMBEDDING_MODEL_NAME` và upsert vector vào collection `WEAVIATE_COLLECTION`. Khi collection chưa có dữ liệu hoặc cloud/model lỗi, Searcher tự fallback về local lexical retrieval.
+Mỗi chunk upload giữ `source_id`, `source_title`, `source_uri`, `locator`, `trust_score` và `text`. Vì vậy kết quả RAG luôn kèm tên tài liệu; kết quả web luôn kèm URL/source.
 
 Web search dùng Firecrawl và được gọi qua `AgentHarness` bằng tool `web.search`. Cấu hình trước khi chạy:
 
@@ -90,6 +99,15 @@ Nếu chưa có `FIRECRAWL_API_KEY`, hệ thống vẫn chạy local retrieval; 
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+Chạy bộ use case trong `data/test.json` và xuất dashboard:
+
+```powershell
+python scripts/run_use_case_dashboard.py --disable-gemini # mock test, không dùng model gen final response
+python scripts/run_use_case_dashboard.py # 
+```
+
+Kết quả được in ra console và lưu tại `eval/use_case_dashboard/results.json` cùng `eval/use_case_dashboard/dashboard.html`. Bỏ `--disable-gemini` nếu muốn chấm với synthesis Gemini thật.
 
 Knowledge base hiện đọc transcript và chatlog local trong `data/vlearn-pack`; mỗi evidence giữ `source_id`, đường dẫn nguồn, locator, quote, relevance score và source trust score. Graph gồm các node Orchestrator, Analyst, Searcher, Validator, HITL Gate và Synthesis; Validator có conditional edge retry một lần khi evidence chưa đạt ngưỡng. Prompt được tách thành `system_prompt` và `user_prompt`; user prompt chứa XML envelope để trace request, history, profile và source.
 

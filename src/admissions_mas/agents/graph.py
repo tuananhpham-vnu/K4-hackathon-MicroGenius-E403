@@ -152,14 +152,23 @@ class LangGraphAdmissionsMAS:
         elif not evidence:
             response = "Mình chưa tìm thấy bằng chứng đủ tin cậy cho câu hỏi này. Bạn vui lòng cung cấp thêm chi tiết hoặc chờ cán bộ tuyển sinh xác nhận."
         else:
-            snippets = " ".join(item["quote"] for item in evidence[:3])
-            response = f"Theo các tài liệu hiện có, thông tin liên quan là: {snippets[:900]} Đây là tư vấn tham khảo dựa trên dữ liệu cục bộ, không phải quyết định tuyển sinh."
+            response = self.workflow.synthesis.synthesize(
+                query=state["query"],
+                evidence=[Evidence(**item) for item in evidence],
+                risk_level=state["orchestration"]["risk_level"],
+                validation=validation,
+                human_required=bool(state.get("human_required") or validation.get("needs_human")),
+                profile=state.get("profile", {}),
+                history=state.get("history", []),
+            )
         if state.get("human_required") or validation.get("needs_human"):
-            response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
+            human_note = "cán bộ tuyển sinh"
+            if human_note not in response.lower():
+                response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
         prompt_xml = XmlPrompt.build(state["request_id"], state["query"], state.get("context"), state.get("history"), state.get("profile"), [Evidence(**item) for item in evidence])
         messages = prompt_messages(request_id=state["request_id"], agent="synthesis", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"), evidence=[Evidence(**item) for item in evidence])
         output_check = self.harness.guardrails.check_output(response, evidence, state["orchestration"]["risk_level"])
-        self.workflow._audit(state["request_id"], "synthesis", {"response": response, "citation_count": len(evidence), "guardrail": output_check.__dict__})
+        self.workflow._audit(state["request_id"], "synthesis", {"response": response, "citation_count": len(evidence), "model": self.workflow.synthesis.model_name if self.workflow.synthesis.configured else "fallback", "guardrail": output_check.__dict__})
         return {"response": response, "prompt_xml": prompt_xml, "evidence": evidence, "system_prompt": messages[0]["content"], "user_prompt": messages[1]["content"], "harness_plan": plan, "guardrail_result": {"passed": output_check.passed, "reasons": output_check.reasons}}
 
     def invoke(self, query: str, *, request_id: str, context: dict[str, Any] | None = None,

@@ -25,3 +25,5 @@ class Evidence:
     query: str
     retrieval_method: str = "lexical_overlap"
     source_check_passed: bool = False
+    source_title: str = ""
+    source_uri: str = ""

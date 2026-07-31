@@ -10,3 +10,4 @@ __pycache__/
 logs/
 data/raw_data/
 scripts/__pycache__/
+venv
