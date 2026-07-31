@@ -1,6 +1,7 @@
 // Set window.__API_BASE__ before loading this file when the frontend is hosted elsewhere.
 const configuredApiBase = new URLSearchParams(window.location.search).get("api_base");
-const API_BASE = window.__API_BASE__ || configuredApiBase || (window.location.port === "8765" ? "" : "http://127.0.0.1:8765");
+const localFrontend = window.location.protocol === "file:" || ["5500", "5173", "3000"].includes(window.location.port);
+const API_BASE = window.__API_BASE__ || configuredApiBase || (localFrontend ? "http://127.0.0.1:8765" : "");
 
 const navItems = [
   { id: "chat", label: "Trò chuyện", icon: "message" },

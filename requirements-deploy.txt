@@ -1,0 +1,13 @@
+# Core runtime
+python-dotenv
+langgraph
+langchain-core
+google-genai
+
+# Optional web retrieval:
+# firecrawl-py
+
+# Optional Weaviate hybrid retrieval. Heavy on free Render instances:
+# sentence-transformers
+# weaviate-client
+
