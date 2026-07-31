@@ -4,19 +4,62 @@ import json
 import re
 from pathlib import Path
 
-from semantic_chunkers import RegexChunker
-
 from ..domain.models import Evidence, Source
 from ..infrastructure.text import stable_id, tokens
 from .semantic_retriever import SemanticRetriever
 
+# Source markdown puts one sentence/list-item per paragraph (e.g. each numbered
+# admission criterion on its own line), so a naive per-sentence split yields
+# fragments too small to carry enough of a query's keywords to rank well.
+# Both the semantic_chunkers path and the fallback merge consecutive small
+# fragments up to this target size so a full criterion/section stays together.
+MIN_CHUNK_CHARS = 420
 
-regex_chunker = RegexChunker()
+# Local docs that were copied from an official web page often say so ("Link
+# chính thức: https://..."). When present, cite that real URL instead of the
+# local file path so "mở nguồn" in the UI actually opens something.
+OFFICIAL_LINK_PATTERN = re.compile(r"link chính thức\s*:\s*(https?://\S+)", re.IGNORECASE)
+
+_chunker = None
+_chunker_unavailable = False
+
+
+def _get_semantic_chunker():
+    """Lazily instantiate semantic_chunkers.RegexChunker.
+
+    semantic_chunkers currently only supports Python <3.14, so this must not
+    be a hard import-time dependency: on a newer interpreter (or if the
+    package is simply missing) indexing has to keep working via the local
+    fallback below instead of crashing the whole app at import time.
+    """
+    global _chunker, _chunker_unavailable
+    if _chunker_unavailable:
+        return None
+    if _chunker is None:
+        try:
+            from semantic_chunkers import RegexChunker
+            _chunker = RegexChunker()
+        except Exception:
+            _chunker_unavailable = True
+            return None
+    return _chunker
 
 
 def regex_chunks(text: str, *, min_chars: int = 40, max_chars: int = 2500) -> list[str]:
-    """Split documents with semantic_chunkers.RegexChunker for RAG indexing."""
-    raw_chunks = regex_chunker([text])
+    """Split documents into retrievable chunks for RAG indexing."""
+    chunker = _get_semantic_chunker()
+    if chunker is not None:
+        try:
+            chunks = _chunks_from_semantic_chunkers(chunker, text, min_chars=min_chars, max_chars=max_chars)
+            if chunks:
+                return chunks
+        except Exception:
+            pass
+    return _fallback_chunks(text, min_chars=min_chars, max_chars=max_chars)
+
+
+def _chunks_from_semantic_chunkers(chunker, text: str, *, min_chars: int, max_chars: int) -> list[str]:
+    raw_chunks = chunker([text])
     chunks: list[str] = []
     for chunk in _flatten_chunks(raw_chunks):
         splits = getattr(chunk, "splits", None)
@@ -25,6 +68,29 @@ def regex_chunks(text: str, *, min_chars: int = 40, max_chars: int = 2500) -> li
         if len(clean) > min_chars:
             chunks.append(clean[:max_chars])
     return chunks
+
+
+def _fallback_chunks(text: str, *, min_chars: int, max_chars: int) -> list[str]:
+    """Paragraph/sentence split with small-fragment merging (no external chunker needed)."""
+    pieces = re.split(r"\n\s*\n|(?<=[.!?])\s+(?=[A-ZÀ-ỴĐ])", text)
+    chunks: list[str] = []
+    buffer_parts: list[str] = []
+    for piece in pieces:
+        if not piece.strip():
+            continue
+        buffer_parts.append(piece)
+        if sum(len(part) for part in buffer_parts) >= MIN_CHUNK_CHARS:
+            _flush_chunk(buffer_parts, chunks, min_chars, max_chars)
+            buffer_parts = []
+    if buffer_parts:
+        _flush_chunk(buffer_parts, chunks, min_chars, max_chars)
+    return chunks
+
+
+def _flush_chunk(parts: list[str], chunks: list[str], min_chars: int, max_chars: int) -> None:
+    clean = re.sub(r"\s+", " ", "\n\n".join(parts)).strip()
+    if len(clean) > min_chars:
+        chunks.append(clean[:max_chars])
 
 
 def _flatten_chunks(items):
@@ -45,8 +111,8 @@ class KnowledgeBase:
         self._load()
         self.semantic = SemanticRetriever(self)
 
-    def _register(self, title: str, path: Path, source_type: str, trust: float) -> Source:
-        source = Source(stable_id("src", str(path.resolve())), title, str(path), source_type, trust)
+    def _register(self, title: str, path: Path, source_type: str, trust: float, uri: str | None = None) -> Source:
+        source = Source(stable_id("src", str(path.resolve())), title, uri or str(path), source_type, trust)
         self.sources[source.source_id] = source
         return source
 
@@ -78,7 +144,8 @@ class KnowledgeBase:
         # The current repository stores the approved admissions corpus here.
         # Keeping this discovery explicit prevents a silently empty knowledge base.
         for path in sorted((self.repo_root / "Tailieutubtc").glob("*.md")):
-            source = self._register(path.stem, path, "official_admissions_document", 0.92)
+            link_match = OFFICIAL_LINK_PATTERN.search(path.read_text(encoding="utf-8"))
+            source = self._register(path.stem, path, "official_admissions_document", 0.92, uri=link_match.group(1) if link_match else None)
             self._index_markdown(path, source)
 
         for path in sorted((self.repo_root / "data").glob("*.json")):

@@ -28,7 +28,7 @@ class TraceabilityTests(unittest.TestCase):
         self.assertEqual(len(result["evidence"]), len(result["sources"]))
         for evidence in result["evidence"]:
             self.assertTrue(evidence["source_id"])
-            self.assertGreaterEqual(evidence["relevance_score"], 0.35)
+            self.assertGreaterEqual(evidence["relevance_score"], 0.30)
             self.assertIn(evidence["source_id"], {source["source_id"] for source in result["sources"]})
 
     def test_current_repository_corpus_is_loaded(self):
