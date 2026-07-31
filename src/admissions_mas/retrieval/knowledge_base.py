@@ -144,8 +144,14 @@ class KnowledgeBase:
         # The current repository stores the approved admissions corpus here.
         # Keeping this discovery explicit prevents a silently empty knowledge base.
         for path in sorted((self.repo_root / "Tailieutubtc").glob("*.md")):
-            link_match = OFFICIAL_LINK_PATTERN.search(path.read_text(encoding="utf-8"))
-            source = self._register(path.stem, path, "official_admissions_document", 0.92, uri=link_match.group(1) if link_match else None)
+            text = path.read_text(encoding="utf-8")
+            link_match = OFFICIAL_LINK_PATTERN.search(text)
+            # A local absolute path (e.g. /home/user/.../file.md) can never be
+            # opened from a browser — neither on a demo machine nor, worse, a
+            # deployed one. server.py serves this same folder at /docs/<name>,
+            # so "mở nguồn" always resolves to something a user can actually click.
+            uri = link_match.group(1) if link_match else f"/docs/{path.name}"
+            source = self._register(path.stem, path, "official_admissions_document", 0.92, uri=uri)
             self._index_markdown(path, source)
 
         for path in sorted((self.repo_root / "data").glob("*.json")):

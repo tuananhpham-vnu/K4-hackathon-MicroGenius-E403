@@ -178,7 +178,6 @@ Các chủ đề được hỏi nhiều nhất:
   | PAIR — Mental Models | Không dùng nhãn `accepted`/`rejected`; chỉ dùng nhãn phù hợp có điều kiện. |
   | PAIR — Errors & Graceful Failure | Tách lỗi thiếu source, source mâu thuẫn, query mơ hồ và vượt thẩm quyền thành các route khác nhau. |
 
-<<<<<<< HEAD
 ## §5. Kiểu lỗi — 4 lớp chỗ khó
 
 | ID | Lớp | Kịch bản | Phát hiện | Xử lý mong đợi |
@@ -191,61 +190,16 @@ Các chủ đề được hỏi nhiều nhất:
 | E06 | Vận hành | Thiếu package LangGraph tại máy demo | Import failure | Fallback domain workflow; vẫn chạy API/UI |
 | E07 | Bảo mật | Người dùng xin mật khẩu, thông tin cá nhân hoặc dữ liệu hồ sơ của người khác | Privacy/security keyword hoặc yêu cầu dữ liệu không thuộc phiên hiện tại | Từ chối, không retrieve |
 | E08 | Hệ thống | API lỗi hoặc server chưa chạy | Fetch exception | UI báo trạng thái thật và hướng dẫn thử lại; dùng fallback workflow nếu có, tuyệt đối không hiển thị câu trả lời giả |
-=======
-## §5. Kiểu lỗi — 4 lớp chỗ khó + kịch bản (≥8) [bảng theo guide §2.5]
->>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
 
 ## §6. Bốn đường đi của trải nghiệm
 - Happy path: · Low-confidence (②): · Failure/không căn cứ (①): · Correction (user sửa):
 - Khi bị đòi ngoài phạm vi (③): · Case đặc thù domain (④):
 
 ## §7. Kiểm thử
-<<<<<<< HEAD
-
-### Chiều chất lượng
-
-| Chiều | Định nghĩa kiểm chứng được |
-|---|---|
-| Routing | Intent thực tế bằng `expected_intent` |
-| HITL | `needs_human` bằng nhãn kỳ vọng |
-| Clarification | Case mơ hồ bật `need_clarification` |
-| Grounding | Số evidence đạt trust/relevance không thấp hơn `min_evidence` |
-| Traceability | Evidence có `source_id`, locator, relevance; source có URI và trust |
-| Safety | High-risk không thiếu cảnh báo cán bộ; out-of-scope không retrieve |
-| Integration | `/`, `/api/health`, `/api/query` trả HTTP 200 và UI gọi API thật |
-
-### Golden set
-
-- File: `eval/golden_set.json`.
-- 20 case: 8 happy path, 4 low-confidence, 4 high-risk, 3 out-of-scope, 1 chitchat.
-- Runner tái lập: `python eval/run_golden_set.py`.
-- Kết quả chi tiết: `eval/results.json`.
-
-### Quality bar
-
-**Đạt khi ≥80% case qua toàn bộ check, 100% case high-risk được route đúng, và không evidence cộng đồng trust 0.62 được dùng làm căn cứ.**
-
-### Kết quả hiện tại
-
-| Lượt | Thay đổi | Passed | Tỷ lệ | Quality bar |
-|---|---|---:|---:|---|
-| Baseline đầu tiên | Sau khi nối corpus/UI | 13/20 | 65% | Không đạt |
-| Lượt 2 | Sửa chitchat, clarification, out-of-scope | 20/20 | 100% | Đạt |
-
-Ngoài golden set:
-
-- 4/4 unit test harness/observability đạt.
-- 6/6 traceability/eval test đạt.
-- `node --check frontend/app.js` đạt.
-- HTTP smoke test: health, trang `/` và query đều 200; query có evidence và validation pass.
-
-Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuyến/evidence tối thiểu, chưa có human grading cho semantic correctness từng câu và chưa đo latency/cost với LLM thật. Con số 100% không được diễn giải là 100% chính xác ngoài tập test.
-=======
 - Chiều chất lượng + định nghĩa kiểm chứng được:
 - Golden set (≥20 case theo cơ cấu trong guide §2.6, file trong eval/):
 - Quality bar (chốt từ 23:59, giữ nguyên sau đó): "Đạt khi ≥ ___% qua bộ, và ___"
 - Kết quả các lượt chạy (bảng % — cập nhật đến trước CP6):
->>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
 
 ## §8. Phân công & kế hoạch
 - Phân công có tên: spec / evidence / prompt / code / demo
@@ -253,7 +207,6 @@ Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuy�
 - Multi-prototype (nếu làm): trục khác biệt của ≥2 phương án + lý do chọn:
 
 ## §9. Changelog
-<<<<<<< HEAD
 
 | Thời điểm | Đổi gì | Vì sao |
 |---|---|---|
@@ -266,6 +219,3 @@ Giới hạn của phép đo: golden set hiện kiểm tra contract/định tuy�
 | 2026-07-30 | Sửa chitchat, low-confidence và out-of-scope | Baseline 13/20; các nhánh này định tuyến sai |
 | 2026-07-30 | Thêm fallback khi máy chưa cài LangGraph | Đảm bảo demo tối thiểu vẫn chạy; cài đủ requirements sẽ dùng graph |
 
-=======
-| Thời điểm | Đổi gì | Vì sao (trỏ về feedback/case nào) |
->>>>>>> a253f9f473072f33cb2c6c8344e5b2b01c8ffbb5
