@@ -7,6 +7,15 @@ from typing import Any
 
 from ..domain.models import Evidence
 
+CAPABILITY_FALLBACK = (
+    "Mình là trợ lý tư vấn tuyển sinh Chương trình Đào tạo Nhân tài AI Thực Chiến (Vingroup phối "
+    "hợp cùng VinUni). Mình có thể giúp bạn tra cứu: điều kiện & đối tượng dự tuyển, học phí/học "
+    "bổng/phụ cấp, lịch tuyển sinh & hạn nộp hồ sơ, quy trình đăng ký và các vòng tuyển sinh, lộ "
+    "trình học và quyền lợi học viên — dựa trên tài liệu chính thức của chương trình. Mình không "
+    "xác nhận kết quả tuyển sinh, không phê duyệt hồ sơ và không thực hiện các tác vụ ngoài tư vấn "
+    "thông tin."
+)
+
 
 class GeminiSynthesisService:
     def __init__(self) -> None:
@@ -60,6 +69,52 @@ class GeminiSynthesisService:
             )
         except Exception:
             return fallback
+
+    def answer_capability_question(self, *, query: str, history: list[dict[str, str]] | None = None) -> str:
+        """Answer meta questions about the bot's own scope ("what can you do?").
+
+        No evidence is involved — this is not an admissions fact, just a
+        description of covered topics — so it is safe to let the model phrase
+        it freely as long as it stays within the fixed topic list below.
+        """
+        if not self.configured:
+            return CAPABILITY_FALLBACK
+        try:
+            return self._generate_capability(query=query, history=history or [])
+        except Exception:
+            return CAPABILITY_FALLBACK
+
+    def _generate_capability(self, *, query: str, history: list[dict[str, str]]) -> str:
+        from google.genai import types
+        response = self._client_instance().models.generate_content(
+            model=self.model_name,
+            contents=self._capability_prompt(query=query, history=history),
+            config=types.GenerateContentConfig(temperature=self.temperature, max_output_tokens=300),
+        )
+        text = getattr(response, "text", "") or ""
+        return text.strip() or CAPABILITY_FALLBACK
+
+    @staticmethod
+    def _capability_prompt(*, query: str, history: list[dict[str, str]]) -> str:
+        return f"""Bạn là trợ lý tư vấn tuyển sinh Chương trình Đào tạo Nhân tài AI Thực Chiến (Vingroup phối hợp cùng VinUni).
+
+Người dùng đang hỏi về khả năng/phạm vi hỗ trợ của bạn (không phải hỏi một thông tin tuyển sinh cụ thể).
+
+Hãy trả lời ngắn gọn, tự nhiên bằng tiếng Việt, giới thiệu các loại thông tin bạn có thể tra cứu: điều kiện & đối tượng dự tuyển,
+học phí/học bổng/phụ cấp, lịch tuyển sinh & hạn nộp hồ sơ, quy trình đăng ký và các vòng tuyển sinh, lộ trình học, quyền lợi học viên.
+
+Quy tắc bắt buộc:
+- Không bịa thêm chức năng không có (không đặt lịch hộ, không xử lý/phê duyệt hồ sơ, không xác nhận kết quả tuyển sinh).
+- Không nhắc chi tiết kỹ thuật (vector, agent, LLM, hybrid search, token...).
+- Giọng thân thiện, chuyên nghiệp, tối đa khoảng 3-4 câu.
+
+Câu hỏi của người dùng:
+{query}
+
+Lịch sử gần đây:
+{history[-5:]}
+
+Hãy trả lời trực tiếp cho user."""
 
     def _client_instance(self):
         if self._client is None:

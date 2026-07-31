@@ -16,7 +16,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": false,
-      "evidence_count": 4
+      "evidence_count": 7
     },
     {
       "id": "G02",
@@ -29,7 +29,7 @@
       },
       "actual_intent": "tuition_and_scholarship",
       "actual_human": false,
-      "evidence_count": 4
+      "evidence_count": 7
     },
     {
       "id": "G03",
@@ -42,7 +42,7 @@
       },
       "actual_intent": "deadline_information",
       "actual_human": false,
-      "evidence_count": 4
+      "evidence_count": 7
     },
     {
       "id": "G04",
@@ -68,7 +68,7 @@
       },
       "actual_intent": "admission_requirements",
       "actual_human": false,
-      "evidence_count": 2
+      "evidence_count": 6
     },
     {
       "id": "G06",
@@ -94,7 +94,7 @@
       },
       "actual_intent": "tuition_and_scholarship",
       "actual_human": false,
-      "evidence_count": 5
+      "evidence_count": 8
     },
     {
       "id": "G08",
@@ -107,7 +107,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": false,
-      "evidence_count": 1
+      "evidence_count": 3
     },
     {
       "id": "G09",
@@ -121,7 +121,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": false,
-      "evidence_count": 3
+      "evidence_count": 0
     },
     {
       "id": "G10",
@@ -135,7 +135,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": false,
-      "evidence_count": 1
+      "evidence_count": 0
     },
     {
       "id": "G11",
@@ -149,7 +149,7 @@
       },
       "actual_intent": "program_recommendation",
       "actual_human": false,
-      "evidence_count": 1
+      "evidence_count": 0
     },
     {
       "id": "G12",
@@ -163,7 +163,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": false,
-      "evidence_count": 2
+      "evidence_count": 0
     },
     {
       "id": "G13",
@@ -189,7 +189,7 @@
       },
       "actual_intent": "admission_requirements",
       "actual_human": true,
-      "evidence_count": 1
+      "evidence_count": 0
     },
     {
       "id": "G15",
@@ -202,7 +202,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": true,
-      "evidence_count": 3
+      "evidence_count": 0
     },
     {
       "id": "G16",
@@ -215,7 +215,7 @@
       },
       "actual_intent": "program_information",
       "actual_human": true,
-      "evidence_count": 8
+      "evidence_count": 0
     },
     {
       "id": "G17",

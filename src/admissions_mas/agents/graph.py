@@ -27,6 +27,7 @@ class MASState(TypedDict, total=False):
     orchestration: dict[str, Any]
     analysis: dict[str, Any]
     evidence: list[dict[str, Any]]
+    sources: list[dict[str, Any]]
     validation: dict[str, Any]
     response: str
     prompt_xml: str
@@ -68,7 +69,7 @@ class LangGraphAdmissionsMAS:
         graph.add_edge(START, "orchestrator")
         graph.add_conditional_edges(
             "orchestrator",
-            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] or state["orchestration"]["is_out_of_scope"] else "analyst",
+            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] or state["orchestration"]["is_out_of_scope"] or state["orchestration"].get("is_capability_question") else "analyst",
             {"analyst": "analyst", "synthesis": "synthesis"},
         )
         graph.add_edge("analyst", "searcher")
@@ -89,7 +90,7 @@ class LangGraphAdmissionsMAS:
     def orchestrator_node(self, state: MASState) -> dict[str, Any]:
         plan = self._harness_context("orchestrator", state)
         input_check = self.harness.guardrails.check_input(state["query"])
-        value = self.workflow.orchestrate(state["query"])
+        value = self.workflow.orchestrate(state["query"], state.get("profile", {}), state.get("history"))
         self.workflow._audit(state["request_id"], "orchestrator", value)
         messages = prompt_messages(request_id=state["request_id"], agent="orchestrator", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"))
         return {"orchestration": value, "retry_count": state.get("retry_count", 0), "system_prompt": messages[0]["content"], "user_prompt": messages[1]["content"], "harness_plan": plan, "guardrail_result": {"passed": input_check.passed, "reasons": input_check.reasons}}
@@ -141,35 +142,18 @@ class LangGraphAdmissionsMAS:
 
     def synthesis_node(self, state: MASState) -> dict[str, Any]:
         plan = self._harness_context("synthesis", state)
-        evidence = [item for item in state.get("evidence", []) if item["source_check_passed"] and item["relevance_score"] >= 0.35]
-        validation = state.get("validation", {})
-        if state["orchestration"]["is_chitchat"]:
-            response = "Chào bạn. Mình có thể hỗ trợ tra cứu thông tin chương trình và hướng dẫn hồ sơ."
-        elif state["orchestration"]["is_out_of_scope"]:
-            response = "Mình không thể thực hiện yêu cầu đó. Mình chỉ hỗ trợ tra cứu và tư vấn thông tin tuyển sinh từ nguồn đã được phê duyệt."
-        elif state["orchestration"]["need_clarification"]:
-            response = "Mình cần thêm thông tin để tra cứu chính xác. Bạn vui lòng nêu rõ khóa học, mốc thời gian hoặc nội dung tuyển sinh bạn muốn hỏi."
-        elif not evidence:
-            response = "Mình chưa tìm thấy bằng chứng đủ tin cậy cho câu hỏi này. Bạn vui lòng cung cấp thêm chi tiết hoặc chờ cán bộ tuyển sinh xác nhận."
-        else:
-            response = self.workflow.synthesis.synthesize(
-                query=state["query"],
-                evidence=[Evidence(**item) for item in evidence],
-                risk_level=state["orchestration"]["risk_level"],
-                validation=validation,
-                human_required=bool(state.get("human_required") or validation.get("needs_human")),
-                profile=state.get("profile", {}),
-                history=state.get("history", []),
-            )
-        if state.get("human_required") or validation.get("needs_human"):
-            human_note = "cán bộ tuyển sinh"
-            if human_note not in response.lower():
-                response += " Trường hợp này cần cán bộ tuyển sinh kiểm tra trước khi đưa ra kết luận chính thức."
-        prompt_xml = XmlPrompt.build(state["request_id"], state["query"], state.get("context"), state.get("history"), state.get("profile"), [Evidence(**item) for item in evidence])
-        messages = prompt_messages(request_id=state["request_id"], agent="synthesis", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"), evidence=[Evidence(**item) for item in evidence])
+        candidate_evidence = [Evidence(**item) for item in state.get("evidence", []) if item["source_check_passed"] and item["relevance_score"] >= 0.30]
+        response, usable = self.workflow.synthesize(
+            state["query"], state["orchestration"], state.get("validation", {}), candidate_evidence,
+            profile=state.get("profile"), history=state.get("history"),
+        )
+        evidence = [item.__dict__ for item in usable]
+        sources = [self.workflow.kb.sources[item.source_id].__dict__ for item in usable]
+        prompt_xml = XmlPrompt.build(state["request_id"], state["query"], state.get("context"), state.get("history"), state.get("profile"), usable)
+        messages = prompt_messages(request_id=state["request_id"], agent="synthesis", query=state["query"], context=state.get("context"), history=state.get("history"), profile=state.get("profile"), evidence=usable)
         output_check = self.harness.guardrails.check_output(response, evidence, state["orchestration"]["risk_level"])
         self.workflow._audit(state["request_id"], "synthesis", {"response": response, "citation_count": len(evidence), "model": self.workflow.synthesis.model_name if self.workflow.synthesis.configured else "fallback", "guardrail": output_check.__dict__})
-        return {"response": response, "prompt_xml": prompt_xml, "evidence": evidence, "system_prompt": messages[0]["content"], "user_prompt": messages[1]["content"], "harness_plan": plan, "guardrail_result": {"passed": output_check.passed, "reasons": output_check.reasons}}
+        return {"response": response, "prompt_xml": prompt_xml, "evidence": evidence, "sources": sources, "system_prompt": messages[0]["content"], "user_prompt": messages[1]["content"], "harness_plan": plan, "guardrail_result": {"passed": output_check.passed, "reasons": output_check.reasons}}
 
     def invoke(self, query: str, *, request_id: str, context: dict[str, Any] | None = None,
                history: list[dict[str, str]] | None = None, profile: dict[str, Any] | None = None) -> dict[str, Any]:

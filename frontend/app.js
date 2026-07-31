@@ -47,11 +47,11 @@ const sources = [
 ];
 
 const topics = [
-  "Điều kiện & Đăng ký",
-  "Bài test đầu vào",
-  "Chương trình & Học tập",
-  "Học phí & Phụ cấp",
-  "Cơ hội nghề nghiệp",
+  { label: "Điều kiện & Đăng ký", ask: "Điều kiện tham gia chương trình là gì?" },
+  { label: "Bài test đầu vào", ask: "Cần ôn gì để chuẩn bị cho bài đánh giá đầu vào?" },
+  { label: "Chương trình & Học tập", ask: "Lộ trình học 12 tuần gồm những giai đoạn nào?" },
+  { label: "Học phí & Phụ cấp", ask: "Chương trình có học phí và phụ cấp không?" },
+  { label: "Cơ hội nghề nghiệp", ask: "Học viên tốt nghiệp có cơ hội việc làm gì?" },
 ];
 
 const pages = {
@@ -217,28 +217,27 @@ function dashboardShell(active, content) {
   `;
 }
 
-function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng ký chương trình AI Thực Chiến được không?") {
+function chatPage() {
+  const conversation = loadConversation();
+  const messagesHtml = conversation.length
+    ? conversation.map(renderMessageHtml).join("")
+    : `
+      <div class="message-row" data-empty-state>
+        <div class="avatar">AI</div>
+        <article class="bubble"><p>Chào bạn! Hãy đặt câu hỏi về chương trình AI Thực Chiến để bắt đầu — gõ vào ô bên dưới hoặc bấm một gợi ý.</p></article>
+      </div>
+    `;
   return dashboardShell("chat", `
-    <section class="chat-layout" data-live-chat data-initial-question="${escapeHtml(initialQuestion)}">
+    <section class="chat-layout" data-live-chat>
       <div class="chat-panel">
         <header class="panel-header">
           <div class="panel-title">
             <h2>AI Tư vấn tuyển sinh AI Thực Chiến</h2>
             <span class="status"><span class="dot"></span> AI đang online</span>
           </div>
-          <button class="icon-btn" aria-label="Lịch sử">⋮</button>
+          <button class="icon-btn" type="button" data-new-chat aria-label="Cuộc trò chuyện mới" title="Bắt đầu cuộc trò chuyện mới">↻</button>
         </header>
-        <div class="messages">
-          <div class="message-row user">
-            <div class="bubble">${escapeHtml(initialQuestion)}<div class="subtle">10:20</div></div>
-          </div>
-          <div class="message-row">
-            <div class="avatar">AI</div>
-            <article class="bubble" data-ai-answer aria-live="polite">
-              <p>Đang tra cứu nguồn tuyển sinh đã kiểm duyệt…</p>
-            </article>
-          </div>
-        </div>
+        <div class="messages" data-messages aria-live="polite">${messagesHtml}</div>
         <div class="quick-chips">
           ${[
             "Bài test đầu vào gồm những gì?",
@@ -246,7 +245,7 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
             "Có cần biết lập trình không?",
             "Phụ cấp của chương trình là bao nhiêu?",
             "Học online hay offline?",
-          ].map((item) => `<button class="chip" data-ask="${item}">${item}</button>`).join("")}
+          ].map((item) => `<button class="chip" data-ask="${escapeHtml(item)}">${item}</button>`).join("")}
         </div>
         <form class="composer" data-chat-form>
           <input name="question" placeholder="Nhập câu hỏi của bạn..." autocomplete="off" />
@@ -259,11 +258,11 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
         <h3>Chủ đề phổ biến</h3>
         <div class="topic-list">
           ${topics.map((topic) => `
-            <a class="topic-item" href="#faq">
+            <button class="topic-item" type="button" data-ask="${escapeHtml(topic.ask)}">
               <span class="page-icon">T</span>
-              <span><strong>${topic}</strong><span>Xem câu hỏi liên quan</span></span>
+              <span><strong>${topic.label}</strong><span>Hỏi agent ngay</span></span>
               <span>›</span>
-            </a>
+            </button>
           `).join("")}
         </div>
         <a class="secondary-btn" href="#faq">Xem tất cả chủ đề</a>
@@ -272,22 +271,108 @@ function chatPage(initialQuestion = "Em học ngành Kinh tế thì có đăng k
   `);
 }
 
-async function runChat(question) {
-  const shell = document.querySelector("[data-live-chat]");
-  if (!shell) return;
-  const answer = shell.querySelector("[data-ai-answer]");
-  const sourceList = shell.querySelector("[data-live-sources]");
-  answer.innerHTML = "<p>Đang tra cứu nguồn tuyển sinh đã kiểm duyệt…</p>";
-  sourceList.innerHTML = '<p class="subtle">Đang kiểm tra nguồn và độ liên quan…</p>';
+// --- Multi-turn conversation state -----------------------------------------
+// Persisted per browser tab (sessionStorage) so a page reload doesn't lose the
+// conversation, but a new tab/window starts fresh. Each entry is the minimal
+// {role, text} shape the backend's history-aware follow-up resolution expects.
+
+function loadConversation() {
+  try {
+    const stored = JSON.parse(sessionStorage.getItem("admission-conversation") || "[]");
+    return Array.isArray(stored) ? stored : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveConversation(messages) {
+  sessionStorage.setItem("admission-conversation", JSON.stringify(messages));
+}
+
+function clearConversation() {
+  sessionStorage.removeItem("admission-conversation");
+  sessionStorage.removeItem("admission-question");
+}
+
+function getSessionId() {
+  let sessionId = sessionStorage.getItem("admission-session");
+  if (!sessionId) {
+    sessionId = `web-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    sessionStorage.setItem("admission-session", sessionId);
+  }
+  return sessionId;
+}
+
+function renderMessageHtml(message) {
+  if (message.role === "user") {
+    return `<div class="message-row user"><div class="bubble">${escapeHtml(message.text)}</div></div>`;
+  }
+  return `
+    <div class="message-row">
+      <div class="avatar">AI</div>
+      <article class="bubble" data-ai-answer><p>${escapeHtml(message.text)}</p></article>
+    </div>
+  `;
+}
+
+function appendMessageToDom(message) {
+  const container = document.querySelector("[data-messages]");
+  if (!container) return null;
+  const wrapper = document.createElement("div");
+  wrapper.innerHTML = renderMessageHtml(message).trim();
+  const row = wrapper.firstElementChild;
+  container.appendChild(row);
+  container.scrollTop = container.scrollHeight;
+  return row;
+}
+
+function updatePendingMessage(row, { text, statusText, traceText, sourceCount, retryQuestion }) {
+  if (!row) return;
+  const bubble = row.querySelector("[data-ai-answer]") || row;
+  bubble.innerHTML = `
+    <p>${escapeHtml(text)}</p>
+    ${statusText ? `<p class="subtle">${escapeHtml(statusText)}</p>` : ""}
+    ${traceText ? `<p class="subtle">${escapeHtml(traceText)}</p>` : ""}
+    ${sourceCount ? `<button class="source-toggle" type="button" data-show-sources>Xem nguồn (${sourceCount})</button>` : ""}
+    ${retryQuestion ? `<button class="source-toggle" type="button" data-retry-question="${escapeHtml(retryQuestion)}">Thử lại</button>` : ""}
+  `;
+}
+
+// Every clickable "feature" that represents a question (composer, quick
+// chips, homepage suggestions, FAQ items, topic shortcuts) funnels through
+// this one function so they all reliably produce a live, evidence-grounded
+// answer instead of only working the first time a page happens to navigate.
+async function askQuestion(question) {
+  const trimmed = String(question || "").trim();
+  if (!trimmed) return;
+
+  if (window.location.hash !== "#chat") {
+    sessionStorage.setItem("admission-question", trimmed);
+    window.location.hash = "chat";
+    return; // render() picks up the pending question on the freshly mounted chat page
+  }
+  sessionStorage.removeItem("admission-question");
+  document.querySelector("[data-messages] [data-empty-state]")?.remove();
+
+  const conversation = loadConversation();
+  const historyForRequest = conversation.map(({ role, text }) => ({ role, text }));
+  conversation.push({ role: "user", text: trimmed });
+  saveConversation(conversation);
+  appendMessageToDom({ role: "user", text: trimmed });
+
+  const sourceList = document.querySelector("[data-live-sources]");
+  if (sourceList) sourceList.innerHTML = '<p class="subtle">Đang kiểm tra nguồn và độ liên quan…</p>';
+  const pendingRow = appendMessageToDom({ role: "assistant", text: "Đang tra cứu nguồn tuyển sinh đã kiểm duyệt…" });
 
   try {
     const response = await fetch(`${API_BASE}/api/query`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        query: question,
+        query: trimmed,
         request_id: `web_${Date.now()}`,
-        context: { session_id: sessionStorage.getItem("admission-session") || "web-demo" },
+        context: { session_id: getSessionId() },
+        history: historyForRequest,
       }),
     });
     const data = await response.json();
@@ -297,55 +382,76 @@ async function runChat(question) {
     const status = validation.passed
       ? `Đã kiểm chứng ${validation.evidence_count || 0} bằng chứng · relevance ${Number(validation.avg_relevance || 0).toFixed(2)} · trust ${Number(validation.avg_source_trust || 0).toFixed(2)}`
       : "Chưa đủ bằng chứng — cần tư vấn viên";
-    const logs = await (await fetch(`${API_BASE}/api/logs`)).json();
-    const requestLogs = logs.filter((item) => item.request_id === data.request_id);
-    answer.innerHTML = `
-      <p>${escapeHtml(data.response)}</p>
-      <p class="subtle">${escapeHtml(status)}</p>
-      <p class="subtle">Trace: ${escapeHtml(data.request_id)} · ${requestLogs.length} bước đã log · ${requestLogs.some((item) => item.step === "tool_call" && item.payload?.tool === "web.search") ? "đã gọi web search" : "local search"}</p>
-      <button class="source-toggle" type="button" data-show-sources>
-        Xem nguồn (${(data.sources || []).length})
-      </button>
-    `;
+    let traceText = `Trace: ${data.request_id}`;
+    try {
+      const logs = await (await fetch(`${API_BASE}/api/logs`)).json();
+      const requestLogs = logs.filter((item) => item.request_id === data.request_id);
+      traceText += ` · ${requestLogs.length} bước đã log · ${requestLogs.some((item) => item.step === "tool_call" && item.payload?.tool === "web.search") ? "đã gọi web search" : "local search"}`;
+    } catch (logError) {
+      // Trace log lookup is best-effort only — the answer itself already succeeded.
+    }
+
+    updatePendingMessage(pendingRow, {
+      text: data.response,
+      statusText: status,
+      traceText,
+      sourceCount: (data.sources || []).length,
+    });
+
+    conversation.push({ role: "assistant", text: data.response });
+    saveConversation(conversation);
+
     const evidenceBySource = new Map((data.evidence || []).map((item) => [item.source_id, item]));
     const uniqueSources = [...new Map((data.sources || []).map((source) => [source.source_id, source])).values()];
-    sourceList.innerHTML = uniqueSources.length
-      ? uniqueSources.map((source) => `
-          <div class="source-card">
-            <span class="page-icon">S</span>
-            <span>
-              <strong>${escapeHtml(source.title)}</strong>
-              <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)} · <a href="${escapeHtml(source.uri)}" target="_blank" rel="noreferrer">mở nguồn</a></span>
-            </span>
-          </div>
-        `).join("")
-      : '<p class="subtle">Không có nguồn đủ ngưỡng để trích dẫn.</p>';
-    bindSourceButton();
+    if (sourceList) {
+      sourceList.innerHTML = uniqueSources.length
+        ? uniqueSources.map((source) => `
+            <div class="source-card">
+              <span class="page-icon">S</span>
+              <span>
+                <strong>${escapeHtml(source.title)}</strong>
+                <span>${escapeHtml(source.source_type)} · ${escapeHtml(evidenceBySource.get(source.source_id)?.locator || "document")} · trust ${Number(source.trust_score).toFixed(2)} · <a href="${escapeHtml(source.uri)}" target="_blank" rel="noreferrer">mở nguồn</a></span>
+              </span>
+            </div>
+          `).join("")
+        : '<p class="subtle">Không có nguồn đủ ngưỡng để trích dẫn.</p>';
+    }
   } catch (error) {
-    answer.innerHTML = `
-      <p>Agent chưa thể hoàn tất yêu cầu này.</p>
-      <p class="subtle">API: ${escapeHtml(`${API_BASE || window.location.origin}/api/query`)}</p>
-      <p class="subtle">Chi tiết kỹ thuật: ${escapeHtml(error.message || "Unknown error")}</p>
-      <button class="source-toggle" type="button" data-retry-query>Thử lại</button>
-    `;
-    sourceList.innerHTML = '<p class="subtle">Chưa tải được nguồn.</p>';
-    const retryButton = shell.querySelector("[data-retry-query]");
-    retryButton?.addEventListener("click", () => runChat(question), { once: true });
+    updatePendingMessage(pendingRow, {
+      text: "Agent chưa thể hoàn tất yêu cầu này.",
+      statusText: `API: ${API_BASE || window.location.origin}/api/query`,
+      traceText: `Chi tiết kỹ thuật: ${error.message || "Unknown error"}`,
+      retryQuestion: trimmed,
+    });
+    if (sourceList) sourceList.innerHTML = '<p class="subtle">Chưa tải được nguồn.</p>';
+    // The just-appended user turn stays in history; only drop it if the whole
+    // turn is retried so we don't duplicate it in the next request's history.
+    conversation.pop();
+    saveConversation(conversation);
   }
 }
 
-function bindSourceButton() {
-  const sourceButton = document.querySelector("[data-show-sources]");
-  if (!sourceButton || sourceButton.dataset.bound === "true") return;
-  sourceButton.dataset.bound = "true";
-  sourceButton.addEventListener("click", () => {
-    const sourcePanel = document.getElementById("source-panel");
-    if (!sourcePanel) return;
-    sourcePanel.classList.remove("attention");
-    requestAnimationFrame(() => sourcePanel.classList.add("attention"));
-    sourcePanel.scrollIntoView({ behavior: "smooth", block: "start" });
-    sourcePanel.focus({ preventScroll: true });
-    sourceButton.textContent = "Đã mở danh sách nguồn";
+// Single delegated listener on the (persistent) messages container handles
+// "Xem nguồn" / "Thử lại" for every turn, including ones appended dynamically
+// after the page's own render() already ran.
+function bindMessagesDelegation() {
+  const container = document.querySelector("[data-messages]");
+  if (!container || container.dataset.delegated === "true") return;
+  container.dataset.delegated = "true";
+  container.addEventListener("click", (event) => {
+    const sourceButton = event.target.closest("[data-show-sources]");
+    if (sourceButton) {
+      const sourcePanel = document.getElementById("source-panel");
+      if (sourcePanel) {
+        sourcePanel.classList.remove("attention");
+        requestAnimationFrame(() => sourcePanel.classList.add("attention"));
+        sourcePanel.scrollIntoView({ behavior: "smooth", block: "start" });
+        sourcePanel.focus({ preventScroll: true });
+      }
+      return;
+    }
+    const retryButton = event.target.closest("[data-retry-question]");
+    if (retryButton) askQuestion(retryButton.dataset.retryQuestion);
   });
 }
 
@@ -565,14 +671,20 @@ function careerPage() {
 
 function faqPage() {
   const faqs = [
-    ["Ngành không kỹ thuật có đăng ký được không?", "Có, nếu ứng viên có tư duy logic, động lực rõ ràng và sẵn sàng bổ sung nền tảng."],
-    ["Có cần biết lập trình trước không?", "Không bắt buộc ở mức nâng cao, nhưng Python cơ bản là lợi thế lớn."],
-    ["Agent có cam kết trúng tuyển không?", "Không. Agent chỉ tư vấn mức phù hợp và các bước chuẩn bị dựa trên nguồn tham khảo."],
-    ["Khi nào cần chuyển tư vấn viên?", "Khi câu hỏi liên quan chính sách cá nhân, học phí cụ thể, cam kết hoặc thông tin chưa có trong nguồn."],
+    "Ngành không kỹ thuật có đăng ký được không?",
+    "Có cần biết lập trình trước không?",
+    "Agent có cam kết trúng tuyển không?",
+    "Khi nào cần chuyển tư vấn viên?",
   ];
   return `
     <section class="faq-grid">
-      ${faqs.map(([q, a]) => `<article class="faq-item"><h3>${q}</h3><p>${a}</p></article>`).join("")}
+      ${faqs.map((question) => `
+        <article class="faq-item">
+          <h3>${question}</h3>
+          <p class="subtle">Bấm để agent trả lời trực tiếp, có trích dẫn nguồn.</p>
+          <button class="secondary-btn" data-ask="${escapeHtml(question)}">Hỏi agent câu này ›</button>
+        </article>
+      `).join("")}
     </section>
   `;
 }
@@ -655,20 +767,21 @@ function contactPage() {
 
 function render() {
   const hash = window.location.hash.replace("#", "") || "home";
-  const storedQuestion = sessionStorage.getItem("admission-question");
 
   if (hash === "home") {
     document.getElementById("app").innerHTML = homePage();
   } else if (hash === "chat") {
-    document.getElementById("app").innerHTML = chatPage(storedQuestion || undefined);
+    document.getElementById("app").innerHTML = chatPage();
   } else {
     document.getElementById("app").innerHTML = contentPage(hash);
   }
 
   bindInteractions();
-  const liveChat = document.querySelector("[data-live-chat]");
-  if (liveChat) {
-    runChat(liveChat.dataset.initialQuestion);
+
+  if (hash === "chat") {
+    bindMessagesDelegation();
+    const pendingQuestion = sessionStorage.getItem("admission-question");
+    if (pendingQuestion) askQuestion(pendingQuestion);
   }
 }
 
@@ -677,23 +790,22 @@ function bindInteractions() {
     form.addEventListener("submit", (event) => {
       event.preventDefault();
       const question = new FormData(form).get("question");
-      if (question && String(question).trim()) {
-        sessionStorage.setItem("admission-question", String(question).trim());
-      }
-      if (window.location.hash === "#chat") {
-        render();
-      } else {
-        window.location.hash = "chat";
-      }
+      form.reset();
+      askQuestion(question);
     });
   });
 
   document.querySelectorAll("[data-ask]").forEach((button) => {
-    button.addEventListener("click", () => {
-      sessionStorage.setItem("admission-question", button.dataset.ask);
-      window.location.hash = "chat";
-    });
+    button.addEventListener("click", () => askQuestion(button.dataset.ask));
   });
+
+  const newChatButton = document.querySelector("[data-new-chat]");
+  if (newChatButton) {
+    newChatButton.addEventListener("click", () => {
+      clearConversation();
+      render();
+    });
+  }
 
   const upload = document.getElementById("cv-upload");
   if (upload) {
@@ -762,8 +874,6 @@ function bindInteractions() {
       notice.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   });
-
-  bindSourceButton();
 
   document.querySelectorAll("[data-rating]").forEach((button) => {
     button.addEventListener("click", () => {
