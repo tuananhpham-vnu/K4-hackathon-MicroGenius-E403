@@ -28,6 +28,11 @@ OUT_OF_SCOPE_WORDS = (
 GREETING_PATTERN = re.compile(r"\b(chào|hello|hi)\b", re.IGNORECASE)
 THANK_PATTERN = re.compile(r"cảm ơn|cám ơn|\bthank", re.IGNORECASE)
 
+# Rule-based fast path (no LLM call): a bare confirmation/denial reply to a
+# clarification the bot itself just asked. Only the exact word/phrase counts —
+# "không" as negation inside a longer sentence must NOT match here.
+CANCEL_WORDS = {"không", "sai", "không phải", "thôi", "bỏ đi", "hủy", "huỷ"}
+
 # Meta questions about the assistant itself ("what can you do?") rather than a
 # concrete admissions question. These should get a flexible, LLM-phrased
 # description of scope instead of being forced through the rigid "please
@@ -96,6 +101,17 @@ RECOMMENDATION_CLARIFICATION_TEXT = (
     "không. Dựa trên thông tin đó mình sẽ đối chiếu với tiêu chí tuyển sinh hiện hành."
 )
 
+# Templates the bot itself sends when it's waiting on the user for more
+# detail. Used to recognize, from history alone, that the *previous* turn was
+# a clarification request — so a bare "thôi"/"hủy" reply can be resolved by
+# rule instead of looping back into another clarification ask.
+CLARIFICATION_TEMPLATES = (GENERIC_CLARIFICATION_TEXT, RECOMMENDATION_CLARIFICATION_TEXT)
+
+CANCEL_ACK_TEXT = (
+    "Được rồi, mình dừng câu hỏi này lại. Bạn cứ hỏi mình nội dung khác về tuyển sinh bất cứ lúc "
+    "nào nhé."
+)
+
 COMMUNITY_SOURCE_NOTICE = (
     "Mình không dùng thông tin từ bài đăng/nhóm cộng đồng để kết luận, chỉ dựa trên tài liệu "
     "chính thức đã kiểm chứng. "
@@ -139,6 +155,26 @@ def _is_ambiguous(query: str) -> bool:
     return not has_anchor and len(tokens(query)) < 5
 
 
+def _has_topic_marker(query: str) -> bool:
+    """Broader anchor set than `_is_ambiguous`: also counts an INTENT_MAPPINGS
+    keyword or a concrete cohort/date value as naming a real topic.
+
+    Only meant to be applied when the user is directly replying to the bot's
+    own clarification ask (see CLARIFICATION_TEMPLATES below) — a bare reply
+    like "Học phí" answers "nêu rõ ... nội dung tuyển sinh (điều kiện, hồ sơ,
+    ... chi phí...)" even though "học phí" isn't in ANCHOR_WORDS. Applying
+    this broader set to a fresh, unprompted first turn would wrongly treat
+    genuinely vague queries ("Hạn bao giờ?") as already answered.
+    """
+    lowered = query.lower()
+    return (
+        any(word in lowered for word in ANCHOR_WORDS)
+        or any(marker in lowered for marker in INTENT_MAPPINGS)
+        or bool(COHORT_PATTERN.search(query))
+        or bool(DATE_PATTERN.search(query))
+    )
+
+
 def _has_conflicting_sources(query: str) -> bool:
     lowered = query.lower()
     dates = set(DATE_PATTERN.findall(query))
@@ -165,6 +201,29 @@ def _last_user_message(history: list[dict[str, str]] | None) -> str:
     return ""
 
 
+def _last_assistant_message(history: list[dict[str, str]] | None) -> str:
+    """Most recent prior bot turn — used to tell what question the user is replying to."""
+    for turn in reversed(history or []):
+        role = str(turn.get("role") or "").lower()
+        text = str(turn.get("text") or turn.get("content") or "").strip()
+        if role in ("assistant", "bot", "ai") and text:
+            return text
+    return ""
+
+
+def _is_cancel_reply(query: str, history: list[dict[str, str]] | None) -> bool:
+    """Fast-path rule: bare "thôi/hủy/không..." replying to the bot's own clarification ask.
+
+    Only the exact word/phrase counts, so this never fires on "không" used as
+    negation inside an ordinary sentence. No LLM call needed either way.
+    """
+    normalized = query.strip().lower().rstrip(".!?")
+    if normalized not in CANCEL_WORDS:
+        return False
+    last_assistant = _last_assistant_message(history).strip()
+    return last_assistant in CLARIFICATION_TEMPLATES
+
+
 class AdmissionsWorkflow:
     """Domain services used by both the legacy facade and LangGraph nodes."""
 
@@ -185,13 +244,23 @@ class AdmissionsWorkflow:
         is_chitchat = _classify_chitchat(query) is not None
         is_out_of_scope = any(word in lowered for word in OUT_OF_SCOPE_WORDS)
         is_capability_question = not is_chitchat and not is_out_of_scope and bool(CAPABILITY_PATTERN.search(query))
+        is_cancel = (
+            not is_chitchat and not is_out_of_scope and not is_capability_question
+            and _is_cancel_reply(query, history)
+        )
         risk = "high" if any(word in lowered for word in HIGH_RISK_WORDS) else "low"
         intent = "program_information"
         for marker, candidate_intent in INTENT_MAPPINGS.items():
             if marker in lowered:
                 intent = candidate_intent
                 break
-        resolved_intent = "chitchat" if is_chitchat else ("out_of_scope" if is_out_of_scope else ("capability_question" if is_capability_question else intent))
+        resolved_intent = (
+            "chitchat" if is_chitchat else
+            "out_of_scope" if is_out_of_scope else
+            "capability_question" if is_capability_question else
+            "cancel_clarification" if is_cancel else
+            intent
+        )
 
         # Elliptical follow-ups ("Còn phụ cấp thì sao?") look ambiguous on their
         # own but are perfectly clear combined with the previous user turn — so
@@ -199,7 +268,7 @@ class AdmissionsWorkflow:
         # anchor-less once the prior turn is folded in.
         contextual_query = query
         need_clarification = False
-        if not is_chitchat and not is_out_of_scope and not is_capability_question:
+        if not is_chitchat and not is_out_of_scope and not is_capability_question and not is_cancel:
             if resolved_intent == "program_recommendation":
                 signals = {**extract_profile_signals(query), **{k: v for k, v in profile.items() if v}}
                 need_clarification = any(field not in signals for field in ("education", "experience", "availability"))
@@ -212,12 +281,18 @@ class AdmissionsWorkflow:
                         if not _is_ambiguous(combined):
                             contextual_query = combined
                             ambiguous = False
+                # Second-turn reply to the bot's own clarification ask: a
+                # short, topic-only answer ("Học phí") should count as having
+                # supplied the missing information instead of looping back
+                # into another clarification round.
+                if ambiguous and _has_topic_marker(query) and _last_assistant_message(history).strip() in CLARIFICATION_TEMPLATES:
+                    ambiguous = False
                 need_clarification = ambiguous
 
-        skip_retrieval = is_chitchat or is_out_of_scope or is_capability_question
+        skip_retrieval = is_chitchat or is_out_of_scope or is_capability_question or is_cancel
         return {
             "intent": resolved_intent, "is_chitchat": is_chitchat, "is_out_of_scope": is_out_of_scope,
-            "is_capability_question": is_capability_question, "contextual_query": contextual_query,
+            "is_capability_question": is_capability_question, "is_cancel": is_cancel, "contextual_query": contextual_query,
             "clarity_score": min(10, max(1, len(tokens(query)) // 2 + 3)), "risk_level": risk, "need_summary": False,
             "need_clarification": need_clarification, "need_human": risk == "high",
             "next_agent": "synthesis" if skip_retrieval else "admissions_analyst",
@@ -343,6 +418,8 @@ class AdmissionsWorkflow:
             return OUT_OF_SCOPE_TEXT, []
         if orchestration.get("is_capability_question"):
             return self.synthesis.answer_capability_question(query=query, history=history), []
+        if orchestration.get("is_cancel"):
+            return CANCEL_ACK_TEXT, []
 
         response: str
         evidence_out: list[Evidence]
@@ -376,8 +453,8 @@ class AdmissionsWorkflow:
         self.logger.event(request_id=request_id, step="request_start", component="workflow", payload={"query": query})
         profile = profile or {}
         orchestration = self.orchestrate(query, profile, history)
-        if orchestration["is_chitchat"] or orchestration["is_out_of_scope"] or orchestration["is_capability_question"]:
-            passed = orchestration["is_chitchat"] or orchestration["is_capability_question"]
+        if orchestration["is_chitchat"] or orchestration["is_out_of_scope"] or orchestration["is_capability_question"] or orchestration.get("is_cancel"):
+            passed = orchestration["is_chitchat"] or orchestration["is_capability_question"] or orchestration.get("is_cancel", False)
             validation = {"passed": passed, "source_check_passed": False, "evidence_count": 0, "avg_relevance": 0.0, "avg_source_trust": 0.0, "risk_level": "low", "needs_human": False, "rejection_reasons": [] if passed else ["Yêu cầu nằm ngoài phạm vi tư vấn tuyển sinh"]}
             analysis, evidence, usable = {}, [], []
         else:

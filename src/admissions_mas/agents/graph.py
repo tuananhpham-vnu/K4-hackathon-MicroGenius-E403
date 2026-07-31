@@ -69,7 +69,7 @@ class LangGraphAdmissionsMAS:
         graph.add_edge(START, "orchestrator")
         graph.add_conditional_edges(
             "orchestrator",
-            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] or state["orchestration"]["is_out_of_scope"] or state["orchestration"].get("is_capability_question") else "analyst",
+            lambda state: "synthesis" if state["orchestration"]["is_chitchat"] or state["orchestration"]["is_out_of_scope"] or state["orchestration"].get("is_capability_question") or state["orchestration"].get("is_cancel") else "analyst",
             {"analyst": "analyst", "synthesis": "synthesis"},
         )
         graph.add_edge("analyst", "searcher")
